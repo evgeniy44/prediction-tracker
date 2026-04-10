@@ -10,22 +10,21 @@
 
 Prophet Checker is a Telegram bot that analyzes predictions made by Ukrainian public figures (politicians, experts, analysts) since 2012. It collects statements from multiple sources, extracts predictions using LLM, verifies them against real events, and provides an interactive chat interface for querying results.
 
-**Target vacancy alignment:** AI Tech Lead @ Coro/Adaptiq — demonstrates production experience with AI/LLMs, agents, agentic workflows, and scalable backend systems.
-
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Rationale |
-|---|---|---|
-| Language | Python 3.11+ | Richest AI/LLM ecosystem |
-| Web Framework | FastAPI + Uvicorn | Async, lightweight, de-facto for AI services |
-| LLM Abstraction | LiteLLM | Vendor-agnostic: OpenAI, Anthropic, open-source |
-| Database | PostgreSQL + pgvector | Structured data + vector search, AWS RDS |
-| ORM | SQLAlchemy 2.0 | Async support, mature, type-safe |
-| Bot | python-telegram-bot / aiogram | Telegram Bot API integration |
-| Deployment | Docker → EC2 (t3.micro) | Cost-effective start, easy migration to ECS/EKS |
-| Database Hosting | AWS RDS (db.t4g.micro) | ~$12/mo, managed PostgreSQL |
+
+| Layer            | Technology                    | Rationale                                       |
+| ---------------- | ----------------------------- | ----------------------------------------------- |
+| Language         | Python 3.11+                  | Richest AI/LLM ecosystem                        |
+| Web Framework    | FastAPI + Uvicorn             | Async, lightweight, de-facto for AI services    |
+| LLM Abstraction  | LiteLLM                       | Vendor-agnostic: OpenAI, Anthropic, open-source |
+| Database         | PostgreSQL + pgvector         | Structured data + vector search, AWS RDS        |
+| ORM              | SQLAlchemy 2.0                | Async support, mature, type-safe                |
+| Bot              | python-telegram-bot / aiogram | Telegram Bot API integration                    |
+| Deployment       | Docker → EC2 (t3.micro)      | Cost-effective start, easy migration to ECS/EKS |
+| Database Hosting | AWS RDS (db.t4g.micro)        | ~$12/mo, managed PostgreSQL                     |
 
 ---
 
@@ -76,31 +75,36 @@ Monolith-first FastAPI application with five modules and clean separation of con
 **bot/** — Telegram Bot interface. Handles user messages, manages conversation flow, formats responses. Design deferred to later phase.
 
 **analysis/** — Core AI pipeline:
+
 - **Prediction Extractor** — LLM-based extraction of predictions from raw text (date, claim, subject, context)
 - **Verification Engine** — cross-references predictions against news/facts, assigns status (confirmed / refuted / unresolved) with confidence score
 - **Confidence Scoring** — when confidence is low, flags prediction for manual review (human-in-the-loop)
 
 **sources/** — Pluggable data collectors. Each source implements a common interface:
+
 ```python
 class Source(Protocol):
     async def collect(self, person: str, date_from: date, date_to: date) -> list[RawDocument]: ...
 ```
+
 - TelegramCollector — collects posts from public Telegram channels
 - NewsCollector — RSS feeds and/or web scraping of Ukrainian news sites
 - Extensible: YouTube, Twitter/X added later by implementing the same interface
 
 **llm/** — Abstraction over LLM providers via LiteLLM:
+
 - Provider-agnostic API calls
 - Prompt templates for prediction extraction and verification
 - Configuration per provider (model, temperature, token limits)
 
 **storage/** — Database abstraction layer:
 
-| Interface | Purpose |
-|---|---|
+
+| Interface              | Purpose                                               |
+| ---------------------- | ----------------------------------------------------- |
 | `PredictionRepository` | CRUD for predictions, filtering by person/date/status |
-| `VectorStore` | Store and query embeddings for RAG semantic search |
-| `SourceRepository` | CRUD for raw source documents and metadata |
+| `VectorStore`          | Store and query embeddings for RAG semantic search    |
+| `SourceRepository`     | CRUD for raw source documents and metadata            |
 
 All business logic depends only on interfaces. Concrete implementation injected at startup via configuration.
 
@@ -142,6 +146,7 @@ All business logic depends only on interfaces. Concrete implementation injected 
 ```
 
 **Key relationships:**
+
 - `Person` 1:N `PersonSource` — a person can be tracked across multiple source types
 - `PersonSource` decouples person from source details (Telegram channel, RSS URL, YouTube channel ID)
 - `Person` 1:N `RawDocument` — raw collected texts linked to person
@@ -183,6 +188,7 @@ Done — predictions available for chat queries
 ```
 
 **Key decisions:**
+
 - Extraction and Verification are **two separate stages** — verification can be re-run when new data becomes available
 - Verification can be delayed — a prediction about "summer 2023" can only be verified after summer 2023
 - All LLM calls go through `llm/` module which logs prompt/response for debugging and cost tracking
@@ -249,6 +255,7 @@ Estimated monthly cost:
 ## Scope
 
 ### In scope (MVP)
+
 - Telegram and news site data collection
 - LLM-based prediction extraction from Ukrainian text
 - Automated verification with confidence scoring
@@ -257,6 +264,7 @@ Estimated monthly cost:
 - Docker deployment on EC2
 
 ### Deferred
+
 - Bot interaction design (commands, response format)
 - YouTube and Twitter/X collectors
 - SQLite repository for local dev
@@ -268,6 +276,7 @@ Estimated monthly cost:
 ## Target Public Figures (Initial)
 
 Ukrainian politicians and experts with extensive public prediction history since 2012:
+
 - Arestovych, Piontkovskiy, and similar figures
 - Focus on geopolitical and war-related predictions
 - Sources primarily in Ukrainian language
