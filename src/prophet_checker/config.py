@@ -1,0 +1,19 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    database_url: str = "postgresql+asyncpg://prophet:prophet@localhost:5432/prophet_checker"
+    llm_provider: str = "openai"
+    llm_model: str = "gpt-4o-mini"
+    llm_api_key: str = ""
+    telegram_bot_token: str = ""
+    telegram_api_id: int = 0
+    telegram_api_hash: str = ""
+    embedding_model: str = "text-embedding-3-small"
+    verification_confidence_threshold: float = 0.6
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+
+def get_settings() -> Settings:
+    return Settings()

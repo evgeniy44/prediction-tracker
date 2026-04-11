@@ -8,3 +8,4 @@ dist/
 *.session
 *.session-journal
 .superpowers/
+/.idea/

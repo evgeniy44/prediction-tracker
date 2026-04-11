@@ -1,0 +1,59 @@
+# -- Project metadata --
+[project]
+name = "prophet-checker"
+version = "0.1.0"
+description = "AI-powered analysis of public figures' predictions"
+requires-python = ">=3.11"  # f-strings, match/case, asyncio improvements
+
+dependencies = [
+    # -- Web framework --
+    "fastapi>=0.115.0",          # REST API + lifespan hooks for bot/pipeline orchestration
+    "uvicorn[standard]>=0.30.0", # ASGI server; [standard] adds uvloop + httptools for performance
+
+    # -- Database --
+    "sqlalchemy[asyncio]>=2.0.0", # ORM + async engine for PostgreSQL; [asyncio] pulls in greenlet
+    "asyncpg>=0.30.0",            # Async PostgreSQL driver (used by SQLAlchemy async engine)
+    "pgvector>=0.3.0",            # pgvector support for SQLAlchemy — vector similarity search on embeddings
+    "alembic>=1.14.0",            # Database migrations (schema versioning)
+
+    # -- Configuration --
+    "pydantic>=2.0.0",            # Data validation for domain models (Person, Prediction, etc.)
+    "pydantic-settings>=2.0.0",   # Settings management — reads .env file and env vars into typed config
+
+    # -- LLM --
+    "litellm>=1.50.0",  # Vendor-agnostic LLM client — switch between OpenAI/Anthropic/local without code changes
+
+    # -- Telegram --
+    "aiogram>=3.13.0",   # Telegram Bot API framework (async) — chatbot interface for users
+    "telethon>=1.37.0",  # Telegram Client API — collecting messages from public channels (not available via Bot API)
+
+    # -- Data collection --
+    "httpx>=0.27.0",           # Async HTTP client for scraping news sites and API calls
+    "feedparser>=6.0.0",       # RSS/Atom feed parser — news source collector
+    "beautifulsoup4>=4.12.0",  # HTML parser — extracting text from news articles
+]
+
+# -- Dev-only dependencies (install via: pip install -e ".[dev]") --
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",          # Test runner
+    "pytest-asyncio>=0.24.0", # Async test support (async def test_... just works)
+    "pytest-cov>=5.0.0",      # Coverage reporting
+    "ruff>=0.6.0",            # Linter + formatter (replaces flake8/black/isort)
+]
+
+# -- Pytest configuration --
+[tool.pytest.ini_options]
+asyncio_mode = "auto"   # No need to mark every async test with @pytest.mark.asyncio
+testpaths = ["tests"]   # Where pytest looks for tests
+pythonpath = ["src"]     # Allows `from prophet_checker.config import Settings` in tests
+
+# -- Ruff linter/formatter configuration --
+[tool.ruff]
+target-version = "py311"  # Match requires-python
+line-length = 100         # Wider than default 88 — better for long SQL/prompt strings
+
+# -- Build system --
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"  # Standard PEP 517 build backend
