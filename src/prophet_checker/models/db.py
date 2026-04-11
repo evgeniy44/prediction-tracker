@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+import uuid
+from datetime import date, datetime
+
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    String,
+    Text,
+    func,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class PersonDB(Base):
+    __tablename__ = "persons"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    sources: Mapped[list[PersonSourceDB]] = relationship(back_populates="person")
+    documents: Mapped[list[RawDocumentDB]] = relationship(back_populates="person")
+    predictions: Mapped[list[PredictionDB]] = relationship(back_populates="person")
+
+
+class PersonSourceDB(Base):
+    __tablename__ = "person_sources"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    person_id: Mapped[str] = mapped_column(ForeignKey("persons.id"), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_identifier: Mapped[str] = mapped_column(String(500), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    person: Mapped[PersonDB] = relationship(back_populates="sources")
+
+
+class RawDocumentDB(Base):
+    __tablename__ = "raw_documents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    person_id: Mapped[str] = mapped_column(ForeignKey("persons.id"), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    url: Mapped[str] = mapped_column(String(2000), nullable=False, unique=True)
+    published_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+    language: Mapped[str] = mapped_column(String(10), default="uk")
+    collected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    processed: Mapped[bool] = mapped_column(Boolean, default=False)  # pipeline flag: predictions extracted?
+
+    person: Mapped[PersonDB] = relationship(back_populates="documents")
+    predictions: Mapped[list[PredictionDB]] = relationship(back_populates="document")
+
+
+class PredictionDB(Base):
+    __tablename__ = "predictions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id: Mapped[str] = mapped_column(ForeignKey("raw_documents.id"), nullable=False)
+    person_id: Mapped[str] = mapped_column(ForeignKey("persons.id"), nullable=False)
+    claim_text: Mapped[str] = mapped_column(Text, nullable=False)
+    prediction_date: Mapped[date] = mapped_column(Date, nullable=False)
+    target_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    topic: Mapped[str] = mapped_column(String(100), default="")
+    status: Mapped[str] = mapped_column(String(20), default="unresolved")
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    evidence_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    evidence_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    embedding = mapped_column(Vector(1536), nullable=True)  # pgvector: 1536 dims = text-embedding-3-small
+
+    document: Mapped[RawDocumentDB] = relationship(back_populates="predictions")
+    person: Mapped[PersonDB] = relationship(back_populates="predictions")
