@@ -1787,378 +1787,7 @@ git push
 
 ---
 
-## Task 8: Source Interface + Telegram Collector
-
-**Files:**
-- Create: `prediction-tracker/src/prophet_checker/sources/__init__.py`
-- Create: `prediction-tracker/src/prophet_checker/sources/interface.py`
-- Create: `prediction-tracker/src/prophet_checker/sources/telegram_collector.py`
-- Create: `prediction-tracker/tests/test_sources_telegram.py`
-
-- [ ] **Step 1: Write tests**
-
-```python
-# prediction-tracker/tests/test_sources_telegram.py
-from datetime import date, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
-
-from prophet_checker.sources.interface import Source
-from prophet_checker.sources.telegram_collector import TelegramCollector
-from prophet_checker.models.domain import RawDocument, SourceType
-
-
-def test_telegram_collector_implements_source():
-    collector = TelegramCollector(api_id=1, api_hash="hash", session_name="test")
-    assert isinstance(collector, Source)
-
-
-async def test_telegram_collector_collect():
-    collector = TelegramCollector(api_id=1, api_hash="hash", session_name="test")
-
-    mock_message = MagicMock()
-    mock_message.id = 123
-    mock_message.date = datetime(2023, 6, 15, 10, 30)
-    mock_message.text = "Прогноз: контрнаступ буде влітку"
-
-    mock_client = AsyncMock()
-    mock_client.get_messages = AsyncMock(return_value=[mock_message])
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=None)
-
-    with patch.object(collector, "_get_client", return_value=mock_client):
-        docs = await collector.collect(
-            person_id="p1",
-            channel="@arestovych",
-            date_from=date(2023, 1, 1),
-            date_to=date(2023, 12, 31),
-        )
-
-    assert len(docs) == 1
-    assert docs[0].source_type == SourceType.TELEGRAM
-    assert docs[0].person_id == "p1"
-    assert "контрнаступ" in docs[0].raw_text
-
-
-async def test_telegram_collector_skips_empty_messages():
-    collector = TelegramCollector(api_id=1, api_hash="hash", session_name="test")
-
-    msg_with_text = MagicMock()
-    msg_with_text.id = 1
-    msg_with_text.date = datetime(2023, 1, 1)
-    msg_with_text.text = "Valid text"
-
-    msg_without_text = MagicMock()
-    msg_without_text.id = 2
-    msg_without_text.date = datetime(2023, 1, 2)
-    msg_without_text.text = None
-
-    mock_client = AsyncMock()
-    mock_client.get_messages = AsyncMock(return_value=[msg_with_text, msg_without_text])
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=None)
-
-    with patch.object(collector, "_get_client", return_value=mock_client):
-        docs = await collector.collect(
-            person_id="p1", channel="@chan",
-            date_from=date(2023, 1, 1), date_to=date(2023, 12, 31),
-        )
-
-    assert len(docs) == 1
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-```bash
-pytest tests/test_sources_telegram.py -v
-```
-
-Expected: FAIL — `ModuleNotFoundError: No module named 'prophet_checker.sources'`
-
-- [ ] **Step 3: Implement source interface and Telegram collector**
-
-```python
-# prediction-tracker/src/prophet_checker/sources/__init__.py
-from prophet_checker.sources.interface import Source
-
-__all__ = ["Source"]
-```
-
-```python
-# prediction-tracker/src/prophet_checker/sources/interface.py
-from __future__ import annotations
-
-from abc import ABC, abstractmethod
-from datetime import date
-
-from prophet_checker.models.domain import RawDocument
-
-
-class Source(ABC):
-    @abstractmethod
-    async def collect(
-        self, person_id: str, channel: str, date_from: date, date_to: date
-    ) -> list[RawDocument]:
-        ...
-```
-
-```python
-# prediction-tracker/src/prophet_checker/sources/telegram_collector.py
-from __future__ import annotations
-
-import uuid
-from datetime import date, datetime
-
-from telethon import TelegramClient
-
-from prophet_checker.models.domain import RawDocument, SourceType
-from prophet_checker.sources.interface import Source
-
-
-class TelegramCollector(Source):
-    def __init__(self, api_id: int, api_hash: str, session_name: str = "prophet_checker"):
-        self._api_id = api_id
-        self._api_hash = api_hash
-        self._session_name = session_name
-
-    def _get_client(self) -> TelegramClient:
-        return TelegramClient(self._session_name, self._api_id, self._api_hash)
-
-    async def collect(
-        self, person_id: str, channel: str, date_from: date, date_to: date
-    ) -> list[RawDocument]:
-        documents = []
-        client = self._get_client()
-
-        async with client:
-            messages = await client.get_messages(
-                channel,
-                offset_date=datetime.combine(date_to, datetime.max.time()),
-                limit=500,
-            )
-
-            for msg in messages:
-                if msg.text is None:
-                    continue
-                if msg.date.date() < date_from:
-                    continue
-
-                doc = RawDocument(
-                    id=str(uuid.uuid4()),
-                    person_id=person_id,
-                    source_type=SourceType.TELEGRAM,
-                    url=f"https://t.me/{channel.lstrip('@')}/{msg.id}",
-                    published_at=msg.date,
-                    raw_text=msg.text,
-                    language="uk",
-                )
-                documents.append(doc)
-
-        return documents
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-```bash
-pytest tests/test_sources_telegram.py -v
-```
-
-Expected: 3 tests PASS
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/prophet_checker/sources/ tests/test_sources_telegram.py
-git commit -m "feat: add Source interface and TelegramCollector"
-git push
-```
-
-**🏁 End of Task 8.** STOP. Show summary to user. Wait for explicit approval before Task 9.
-
----
-
-## Task 9: News Collector
-
-**Files:**
-- Create: `prediction-tracker/src/prophet_checker/sources/news_collector.py`
-- Create: `prediction-tracker/tests/test_sources_news.py`
-
-- [ ] **Step 1: Write tests**
-
-```python
-# prediction-tracker/tests/test_sources_news.py
-from datetime import date, datetime
-from unittest.mock import AsyncMock, patch, MagicMock
-
-from prophet_checker.sources.interface import Source
-from prophet_checker.sources.news_collector import NewsCollector
-from prophet_checker.models.domain import SourceType
-
-
-def test_news_collector_implements_source():
-    collector = NewsCollector()
-    assert isinstance(collector, Source)
-
-
-async def test_news_collector_collect_from_rss():
-    collector = NewsCollector()
-
-    fake_feed = MagicMock()
-    fake_feed.entries = [
-        MagicMock(
-            title="Арестович про контрнаступ",
-            link="https://news.com/article1",
-            published_parsed=(2023, 6, 15, 10, 30, 0, 0, 0, 0),
-            summary="Контрнаступ буде успішним, каже Арестович",
-        ),
-    ]
-
-    mock_response = AsyncMock()
-    mock_response.text = "<rss>mock</rss>"
-    mock_response.status_code = 200
-
-    with patch("prophet_checker.sources.news_collector.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get = AsyncMock(return_value=mock_response)
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=None)
-        mock_client_cls.return_value = mock_client
-
-        with patch("prophet_checker.sources.news_collector.feedparser.parse", return_value=fake_feed):
-            docs = await collector.collect(
-                person_id="p1",
-                channel="https://news.com/rss/arestovych",
-                date_from=date(2023, 1, 1),
-                date_to=date(2023, 12, 31),
-            )
-
-    assert len(docs) == 1
-    assert docs[0].source_type == SourceType.NEWS
-    assert "контрнаступ" in docs[0].raw_text.lower()
-
-
-async def test_news_collector_filters_by_date():
-    collector = NewsCollector()
-
-    fake_feed = MagicMock()
-    fake_feed.entries = [
-        MagicMock(
-            title="Old article",
-            link="https://news.com/old",
-            published_parsed=(2020, 1, 1, 0, 0, 0, 0, 0, 0),
-            summary="Old content",
-        ),
-        MagicMock(
-            title="New article",
-            link="https://news.com/new",
-            published_parsed=(2023, 6, 1, 0, 0, 0, 0, 0, 0),
-            summary="New content",
-        ),
-    ]
-
-    mock_response = AsyncMock()
-    mock_response.text = "<rss>mock</rss>"
-    mock_response.status_code = 200
-
-    with patch("prophet_checker.sources.news_collector.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get = AsyncMock(return_value=mock_response)
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=None)
-        mock_client_cls.return_value = mock_client
-
-        with patch("prophet_checker.sources.news_collector.feedparser.parse", return_value=fake_feed):
-            docs = await collector.collect(
-                person_id="p1",
-                channel="https://news.com/rss",
-                date_from=date(2023, 1, 1),
-                date_to=date(2023, 12, 31),
-            )
-
-    assert len(docs) == 1
-    assert docs[0].url == "https://news.com/new"
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-```bash
-pytest tests/test_sources_news.py -v
-```
-
-Expected: FAIL — `ImportError: cannot import name 'NewsCollector'`
-
-- [ ] **Step 3: Implement news collector**
-
-```python
-# prediction-tracker/src/prophet_checker/sources/news_collector.py
-from __future__ import annotations
-
-import uuid
-from datetime import date, datetime
-from time import mktime
-
-import feedparser
-import httpx
-
-from prophet_checker.models.domain import RawDocument, SourceType
-from prophet_checker.sources.interface import Source
-
-
-class NewsCollector(Source):
-    async def collect(
-        self, person_id: str, channel: str, date_from: date, date_to: date
-    ) -> list[RawDocument]:
-        documents = []
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(channel, timeout=30.0)
-            feed = feedparser.parse(response.text)
-
-        for entry in feed.entries:
-            published_time = entry.get("published_parsed")
-            if published_time is None:
-                continue
-
-            published_dt = datetime.fromtimestamp(mktime(published_time))
-            if published_dt.date() < date_from or published_dt.date() > date_to:
-                continue
-
-            text = f"{entry.get('title', '')}\n\n{entry.get('summary', '')}"
-
-            doc = RawDocument(
-                id=str(uuid.uuid4()),
-                person_id=person_id,
-                source_type=SourceType.NEWS,
-                url=entry.get("link", ""),
-                published_at=published_dt,
-                raw_text=text.strip(),
-                language="uk",
-            )
-            documents.append(doc)
-
-        return documents
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-```bash
-pytest tests/test_sources_news.py -v
-```
-
-Expected: 3 tests PASS
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/prophet_checker/sources/news_collector.py tests/test_sources_news.py
-git commit -m "feat: add NewsCollector with RSS feed support"
-git push
-```
-
-**🏁 End of Task 9. Milestone M2 complete!** STOP. Show summary to user. Wait for explicit approval before M3.
-
----
-
-## Task 10: Prediction Extractor
+## Task 8: Prediction Extractor
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/analysis/__init__.py`
@@ -2345,15 +1974,201 @@ git commit -m "feat: add PredictionExtractor with LLM-based prediction extractio
 git push
 ```
 
-**🏁 End of Task 10.** STOP. Show summary to user. Wait for explicit approval before Task 11.
+**🏁 End of Task 8.** STOP. Show summary to user. Wait for explicit approval before Task 9.
 
 ---
 
-## Task 11: Prediction Verifier
+## Task 9: Prediction Verifier
+
+
 
 **Files:**
-- Create: `prediction-tracker/src/prophet_checker/analysis/verifier.py`
-- Create: `prediction-tracker/tests/test_analysis_verifier.py`
+- Create: `prediction-tracker/src/prophet_checker/analysis/__init__.py`
+- Create: `prediction-tracker/src/prophet_checker/analysis/extractor.py`
+- Create: `prediction-tracker/tests/test_analysis_extractor.py`
+
+- [ ] **Step 1: Write tests**
+
+```python
+# prediction-tracker/tests/test_analysis_extractor.py
+import json
+from datetime import date, datetime
+from unittest.mock import AsyncMock
+
+from prophet_checker.analysis.extractor import PredictionExtractor
+from prophet_checker.models.domain import RawDocument, SourceType, PredictionStatus
+
+
+async def test_extractor_extracts_predictions():
+    mock_llm = AsyncMock()
+    mock_llm.complete = AsyncMock(return_value=json.dumps({
+        "predictions": [
+            {
+                "claim_text": "Контрнаступ почнеться влітку 2023",
+                "prediction_date": "2023-01-15",
+                "target_date": "2023-06-01",
+                "topic": "війна",
+            }
+        ]
+    }))
+    mock_llm.embed = AsyncMock(return_value=[0.1] * 1536)
+
+    extractor = PredictionExtractor(llm_client=mock_llm)
+
+    doc = RawDocument(
+        id="d1", person_id="p1", source_type=SourceType.TELEGRAM,
+        url="https://t.me/chan/1", published_at=datetime(2023, 1, 15),
+        raw_text="Я думаю що контрнаступ почнеться влітку 2023 року",
+    )
+
+    predictions = await extractor.extract(doc, person_name="Арестович")
+
+    assert len(predictions) == 1
+    assert predictions[0].claim_text == "Контрнаступ почнеться влітку 2023"
+    assert predictions[0].person_id == "p1"
+    assert predictions[0].document_id == "d1"
+    assert predictions[0].status == PredictionStatus.UNRESOLVED
+    assert predictions[0].embedding is not None
+    assert len(predictions[0].embedding) == 1536
+
+
+async def test_extractor_handles_no_predictions():
+    mock_llm = AsyncMock()
+    mock_llm.complete = AsyncMock(return_value=json.dumps({"predictions": []}))
+
+    extractor = PredictionExtractor(llm_client=mock_llm)
+
+    doc = RawDocument(
+        id="d1", person_id="p1", source_type=SourceType.TELEGRAM,
+        url="https://t.me/chan/2", published_at=datetime(2023, 1, 15),
+        raw_text="Сьогодні гарна погода",
+    )
+
+    predictions = await extractor.extract(doc, person_name="Арестович")
+    assert predictions == []
+
+
+async def test_extractor_handles_llm_error():
+    mock_llm = AsyncMock()
+    mock_llm.complete = AsyncMock(return_value="not valid json")
+
+    extractor = PredictionExtractor(llm_client=mock_llm)
+
+    doc = RawDocument(
+        id="d1", person_id="p1", source_type=SourceType.TELEGRAM,
+        url="https://t.me/chan/3", published_at=datetime(2023, 1, 15),
+        raw_text="Some text",
+    )
+
+    predictions = await extractor.extract(doc, person_name="Арестович")
+    assert predictions == []
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+pytest tests/test_analysis_extractor.py -v
+```
+
+Expected: FAIL — `ModuleNotFoundError: No module named 'prophet_checker.analysis'`
+
+- [ ] **Step 3: Implement prediction extractor**
+
+```python
+# prediction-tracker/src/prophet_checker/analysis/__init__.py
+from prophet_checker.analysis.extractor import PredictionExtractor
+from prophet_checker.analysis.verifier import PredictionVerifier
+
+__all__ = ["PredictionExtractor", "PredictionVerifier"]
+```
+
+```python
+# prediction-tracker/src/prophet_checker/analysis/extractor.py
+from __future__ import annotations
+
+import uuid
+from datetime import date
+
+from prophet_checker.llm.client import LLMClient
+from prophet_checker.llm.prompts import (
+    build_extraction_prompt,
+    get_extraction_system,
+    parse_extraction_response,
+)
+from prophet_checker.models.domain import Prediction, PredictionStatus, RawDocument
+
+
+class PredictionExtractor:
+    def __init__(self, llm_client: LLMClient):
+        self._llm = llm_client
+
+    async def extract(self, document: RawDocument, person_name: str) -> list[Prediction]:
+        prompt = build_extraction_prompt(
+            text=document.raw_text,
+            person_name=person_name,
+            published_date=document.published_at.strftime("%Y-%m-%d"),
+        )
+
+        response = await self._llm.complete(prompt, system=get_extraction_system())
+        raw_predictions = parse_extraction_response(response)
+
+        predictions = []
+        for raw in raw_predictions:
+            claim_text = raw.get("claim_text", "")
+            if not claim_text:
+                continue
+
+            prediction_date_str = raw.get("prediction_date", "")
+            try:
+                prediction_date = date.fromisoformat(prediction_date_str)
+            except ValueError:
+                prediction_date = document.published_at.date()
+
+            target_date = None
+            target_date_str = raw.get("target_date")
+            if target_date_str:
+                try:
+                    target_date = date.fromisoformat(target_date_str)
+                except ValueError:
+                    pass
+
+            embedding = await self._llm.embed(claim_text)
+
+            prediction = Prediction(
+                id=str(uuid.uuid4()),
+                document_id=document.id,
+                person_id=document.person_id,
+                claim_text=claim_text,
+                prediction_date=prediction_date,
+                target_date=target_date,
+                topic=raw.get("topic", ""),
+                status=PredictionStatus.UNRESOLVED,
+                confidence=0.0,
+                embedding=embedding,
+            )
+            predictions.append(prediction)
+
+        return predictions
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+pytest tests/test_analysis_extractor.py -v
+```
+
+Expected: 3 tests PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/prophet_checker/analysis/ tests/test_analysis_extractor.py
+git commit -m "feat: add PredictionExtractor with LLM-based prediction extraction"
+git push
+```
+
+**🏁 End of Task 8.** STOP. Show summary to user. Wait for explicit approval before Task 9.
+
 
 - [ ] **Step 1: Write tests**
 
@@ -2537,11 +2352,11 @@ git commit -m "feat: add PredictionVerifier with confidence thresholding"
 git push
 ```
 
-**🏁 End of Task 11.** STOP. Show summary to user. Wait for explicit approval before Task 12.
+**🏁 End of Task 9. Milestone M2 complete!** STOP. Show summary to user. Wait for explicit approval before M3.
 
 ---
 
-## Task 12: Ingestion Pipeline Orchestrator
+## Task 10: Ingestion Pipeline Orchestrator
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/ingestion.py`
@@ -2782,7 +2597,7 @@ git push
 
 ---
 
-## Task 13: FastAPI Application Entry Point
+## Task 11: FastAPI Application Entry Point
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/main.py`
@@ -2839,7 +2654,7 @@ git push
 
 ---
 
-## Task 14: Docker + Docker Compose
+## Task 12: Docker + Docker Compose
 
 **Files:**
 - Create: `prediction-tracker/Dockerfile`
@@ -2930,7 +2745,7 @@ git push
 
 ---
 
-## Task 15: Run Alembic Migration
+## Task 13: Run Alembic Migration
 
 **Files:**
 - Modify: `prediction-tracker/alembic.ini` (URL from env)
@@ -2977,7 +2792,7 @@ git push
 
 ---
 
-## Task 16: Integration Smoke Test
+## Task 14: Integration Smoke Test
 
 **Files:**
 - Create: `prediction-tracker/tests/test_integration.py`
@@ -3093,7 +2908,7 @@ git push
 
 ---
 
-## Task 16: GitHub Actions CI
+## Task 15: GitHub Actions CI
 
 **Files:**
 - Create: `prediction-tracker/.github/workflows/ci.yml`
@@ -3181,7 +2996,99 @@ git push
 
 ---
 
-## Task 17: AWS RDS PostgreSQL + pgvector
+## Task 16: Source Interface + Telegram Collector
+
+**Files:**
+- Create: `prediction-tracker/src/prophet_checker/sources/__init__.py`
+- Create: `prediction-tracker/src/prophet_checker/sources/interface.py`
+- Create: `prediction-tracker/src/prophet_checker/sources/telegram_collector.py`
+- Create: `prediction-tracker/tests/test_sources_telegram.py`
+
+- [ ] **Step 1: Write tests**
+
+```python
+# prediction-tracker/tests/test_sources_telegram.py
+from datetime import date, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from prophet_checker.sources.interface import Source
+from prophet_checker.sources.telegram_collector import TelegramCollector
+from prophet_checker.models.domain import RawDocument, SourceType
+
+
+def test_telegram_collector_implements_source():
+    collector = TelegramCollector(api_id=1, api_hash="hash", session_name="test")
+    assert isinstance(collector, Source)
+
+
+async def test_telegram_collector_collect():
+    collector = TelegramCollector(api_id=1, api_hash="hash", session_name="test")
+    mock_message = MagicMock()
+    mock_message.id = 123
+    mock_message.date = datetime(2023, 6, 15, 10, 30)
+    mock_message.text = "Прогноз: контрнаступ буде влітку"
+    mock_client = AsyncMock()
+    mock_client.get_messages = AsyncMock(return_value=[mock_message])
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    with patch.object(collector, "_get_client", return_value=mock_client):
+        docs = await collector.collect(
+            person_id="p1", channel="@arestovych",
+            date_from=date(2023, 1, 1), date_to=date(2023, 12, 31),
+        )
+    assert len(docs) == 1
+    assert docs[0].source_type == SourceType.TELEGRAM
+    assert "контрнаступ" in docs[0].raw_text
+
+
+async def test_telegram_collector_skips_empty_messages():
+    collector = TelegramCollector(api_id=1, api_hash="hash", session_name="test")
+    msg_with_text = MagicMock()
+    msg_with_text.id = 1
+    msg_with_text.date = datetime(2023, 1, 1)
+    msg_with_text.text = "Valid text"
+    msg_without_text = MagicMock()
+    msg_without_text.id = 2
+    msg_without_text.date = datetime(2023, 1, 2)
+    msg_without_text.text = None
+    mock_client = AsyncMock()
+    mock_client.get_messages = AsyncMock(return_value=[msg_with_text, msg_without_text])
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    with patch.object(collector, "_get_client", return_value=mock_client):
+        docs = await collector.collect(
+            person_id="p1", channel="@chan",
+            date_from=date(2023, 1, 1), date_to=date(2023, 12, 31),
+        )
+    assert len(docs) == 1
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **Step 3: Implement**
+- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **Step 5: Commit**
+
+**🏁 End of Task 16.** STOP. Show summary to user. Wait for explicit approval before Task 17.
+
+---
+
+## Task 17: News Collector
+
+**Files:**
+- Create: `prediction-tracker/src/prophet_checker/sources/news_collector.py`
+- Create: `prediction-tracker/tests/test_sources_news.py`
+
+- [ ] **Step 1: Write tests**
+- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **Step 3: Implement**
+- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **Step 5: Commit**
+
+**🏁 End of Task 17.** STOP. Show summary to user. Wait for explicit approval before Task 18.
+
+---
+
+## Task 18: AWS RDS PostgreSQL + pgvector
 
 **Files:**
 - Create: `prediction-tracker/infra/setup-rds.sh`
@@ -3278,7 +3185,7 @@ git push
 
 ---
 
-## Task 18: AWS EC2 + Deploy
+## Task 19: AWS EC2 + Deploy
 
 **Files:**
 - Create: `prediction-tracker/infra/setup-ec2.sh`
