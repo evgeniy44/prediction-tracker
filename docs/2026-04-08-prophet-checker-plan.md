@@ -2356,7 +2356,176 @@ git push
 
 ---
 
-## Task 10: Ingestion Pipeline Orchestrator
+## Task 10: Smoke Test — 100 постів через Claude Sonnet 4.6
+
+**Files:**
+- Create: `prediction-tracker/scripts/smoke_test.py`
+- Create: `prediction-tracker/scripts/smoke_results.json` (генерується скриптом)
+
+**Ціль:** Вперше запустити реальний LLM на живих даних. Перевірити якість extraction промптів на реальному контенті до того як будувати повний pipeline.
+
+- [ ] **Step 1: Підготувати тестові дані**
+
+Створити `scripts/sample_posts.json` з 100 реальними постами (або репрезентативними прикладами):
+
+```json
+[
+  {
+    "id": "p1",
+    "person_name": "Арестович",
+    "published_at": "2023-01-15",
+    "text": "Текст посту..."
+  }
+]
+```
+
+- [ ] **Step 2: Створити smoke test скрипт**
+
+```python
+# prediction-tracker/scripts/smoke_test.py
+"""
+Smoke test: run PredictionExtractor on 100 real posts via Claude Sonnet 4.6.
+Usage: python scripts/smoke_test.py
+
+Requires:
+  ANTHROPIC_API_KEY=<key> in environment or .env file
+"""
+import asyncio
+import json
+import os
+import time
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from prophet_checker.llm.client import LLMClient
+from prophet_checker.analysis.extractor import PredictionExtractor
+from prophet_checker.models.domain import RawDocument, SourceType
+from datetime import datetime
+
+
+async def main():
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY not set")
+
+    llm = LLMClient(
+        provider="anthropic",
+        model="claude-sonnet-4-6",
+        api_key=api_key,
+        embedding_model="text-embedding-3-small",
+    )
+    extractor = PredictionExtractor(llm_client=llm)
+
+    posts_path = Path(__file__).parent / "sample_posts.json"
+    posts = json.loads(posts_path.read_text())[:100]
+
+    results = []
+    total_predictions = 0
+    errors = 0
+    start = time.time()
+
+    for i, post in enumerate(posts, 1):
+        print(f"[{i}/{len(posts)}] Processing post {post['id']}...")
+        try:
+            doc = RawDocument(
+                id=post["id"],
+                person_id="smoke-test",
+                source_type=SourceType.TELEGRAM,
+                url=f"https://t.me/smoke/{post['id']}",
+                published_at=datetime.fromisoformat(post["published_at"]),
+                raw_text=post["text"],
+            )
+            predictions = await extractor.extract(doc, person_name=post["person_name"])
+            results.append({
+                "post_id": post["id"],
+                "text_preview": post["text"][:100],
+                "predictions_found": len(predictions),
+                "predictions": [
+                    {
+                        "claim_text": p.claim_text,
+                        "topic": p.topic,
+                        "prediction_date": str(p.prediction_date),
+                        "target_date": str(p.target_date) if p.target_date else None,
+                    }
+                    for p in predictions
+                ],
+            })
+            total_predictions += len(predictions)
+        except Exception as e:
+            print(f"  ERROR: {e}")
+            errors += 1
+            results.append({"post_id": post["id"], "error": str(e)})
+
+    elapsed = time.time() - start
+
+    summary = {
+        "total_posts": len(posts),
+        "total_predictions": total_predictions,
+        "avg_predictions_per_post": round(total_predictions / len(posts), 2),
+        "errors": errors,
+        "elapsed_seconds": round(elapsed, 1),
+        "results": results,
+    }
+
+    output_path = Path(__file__).parent / "smoke_results.json"
+    output_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2))
+
+    print(f"\n✅ Done!")
+    print(f"   Posts processed : {len(posts)}")
+    print(f"   Predictions found: {total_predictions}")
+    print(f"   Avg per post     : {summary['avg_predictions_per_post']}")
+    print(f"   Errors           : {errors}")
+    print(f"   Time             : {elapsed:.1f}s")
+    print(f"   Results saved to : {output_path}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+- [ ] **Step 3: Запустити скрипт**
+
+```bash
+cd prediction-tracker
+source .venv/bin/activate
+ANTHROPIC_API_KEY=sk-ant-... python scripts/smoke_test.py
+```
+
+- [ ] **Step 4: Проаналізувати результати**
+
+Переглянути `scripts/smoke_results.json`. Оцінити вручну:
+- Чи коректно витягуються предсказання?
+- Чи є хибнопозитивні (не-предсказання)?
+- Чи є хибнонегативні (пропущені предсказання)?
+- Якість `topic` класифікації
+
+Якщо якість недостатня — скоригувати `EXTRACTION_TEMPLATE` в `prompts.py` і повторити.
+
+- [ ] **Step 5: Записати результати в `docs/progress.md`**
+
+Додати в progress.md: кількість постів, кількість знайдених предсказань, estimated cost, час виконання, суб'єктивна оцінка якості.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add scripts/smoke_test.py scripts/sample_posts.json
+# smoke_results.json — НЕ комітити (в .gitignore)
+git commit -m "feat: add smoke test script for 100-post extraction via Claude Sonnet 4.6"
+git push
+```
+
+**🏁 End of Task 10.** STOP. Проаналізуй результати з користувачем. Отримай явне підтвердження перед Task 11.
+
+---
+
+## Task 11: Ingestion Pipeline Orchestrator
+
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/ingestion.py`
@@ -2597,7 +2766,7 @@ git push
 
 ---
 
-## Task 11: FastAPI Application Entry Point
+## Task 12: FastAPI Application Entry Point
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/main.py`
@@ -2654,7 +2823,7 @@ git push
 
 ---
 
-## Task 12: Docker + Docker Compose
+## Task 13: Docker + Docker Compose
 
 **Files:**
 - Create: `prediction-tracker/Dockerfile`
@@ -2745,7 +2914,7 @@ git push
 
 ---
 
-## Task 13: Run Alembic Migration
+## Task 14: Run Alembic Migration
 
 **Files:**
 - Modify: `prediction-tracker/alembic.ini` (URL from env)
@@ -2792,7 +2961,7 @@ git push
 
 ---
 
-## Task 14: Integration Smoke Test
+## Task 15: Integration Smoke Test
 
 **Files:**
 - Create: `prediction-tracker/tests/test_integration.py`
@@ -2908,7 +3077,7 @@ git push
 
 ---
 
-## Task 15: GitHub Actions CI
+## Task 16: GitHub Actions CI
 
 **Files:**
 - Create: `prediction-tracker/.github/workflows/ci.yml`
@@ -2996,7 +3165,7 @@ git push
 
 ---
 
-## Task 16: Source Interface + Telegram Collector
+## Task 17: Source Interface + Telegram Collector
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/sources/__init__.py`
@@ -3072,7 +3241,7 @@ async def test_telegram_collector_skips_empty_messages():
 
 ---
 
-## Task 17: News Collector
+## Task 18: News Collector
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/sources/news_collector.py`
@@ -3088,7 +3257,7 @@ async def test_telegram_collector_skips_empty_messages():
 
 ---
 
-## Task 18: AWS RDS PostgreSQL + pgvector
+## Task 19: AWS RDS PostgreSQL + pgvector
 
 **Files:**
 - Create: `prediction-tracker/infra/setup-rds.sh`
@@ -3185,7 +3354,7 @@ git push
 
 ---
 
-## Task 19: AWS EC2 + Deploy
+## Task 20: AWS EC2 + Deploy
 
 **Files:**
 - Create: `prediction-tracker/infra/setup-ec2.sh`
