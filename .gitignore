@@ -9,3 +9,5 @@ dist/
 *.session-journal
 .superpowers/
 /.idea/
+scripts/sample_posts.json
+scripts/smoke_results.json
