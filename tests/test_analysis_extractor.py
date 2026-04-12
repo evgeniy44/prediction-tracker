@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+import json
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from prophet_checker.analysis.extractor import PredictionExtractor
+from prophet_checker.models.domain import Prediction, PredictionStatus
+
+
+def make_llm(complete_return: str, embed_return: list[float] | None = None):
+    llm = MagicMock()
+    llm.complete = AsyncMock(return_value=complete_return)
+    llm.embed = AsyncMock(return_value=embed_return or [0.0] * 1536)
+    return llm
+
+
+LLM_RESPONSE_ONE = json.dumps({
+    "predictions": [
+        {
+            "claim_text": "Контрнаступ почнеться влітку 2023 року",
+            "prediction_date": "2023-01-15",
+            "target_date": "2023-06-01",
+            "topic": "війна",
+        }
+    ]
+})
+
+LLM_RESPONSE_NONE = json.dumps({"predictions": []})
+
+
+async def test_extract_returns_predictions():
+    llm = make_llm(LLM_RESPONSE_ONE)
+    extractor = PredictionExtractor(llm)
+
+    predictions = await extractor.extract(
+        text="Контрнаступ почнеться влітку 2023 року",
+        person_id="person-1",
+        document_id="doc-10",
+        person_name="Арестович",
+        published_date="2023-01-15",
+    )
+
+    assert len(predictions) == 1
+    p = predictions[0]
+    assert isinstance(p, Prediction)
+    assert p.claim_text == "Контрнаступ почнеться влітку 2023 року"
+    assert p.status == PredictionStatus.UNRESOLVED
+    assert p.confidence == 0.0
+    assert p.person_id == "person-1"
+    assert p.document_id == "doc-10"
+    assert p.topic == "війна"
+    assert p.id is not None  # UUID generated
+    assert len(p.embedding) == 1536
+
+
+async def test_extract_no_predictions():
+    llm = make_llm(LLM_RESPONSE_NONE)
+    extractor = PredictionExtractor(llm)
+
+    predictions = await extractor.extract(
+        text="Сьогодні гарна погода.",
+        person_id="person-1",
+        document_id="doc-10",
+        person_name="Арестович",
+        published_date="2023-01-15",
+    )
+
+    assert predictions == []
+    llm.embed.assert_not_called()
+
+
+async def test_extract_llm_error_returns_empty():
+    llm = MagicMock()
+    llm.complete = AsyncMock(side_effect=Exception("LLM unavailable"))
+    extractor = PredictionExtractor(llm)
+
+    predictions = await extractor.extract(
+        text="Щось станеться завтра.",
+        person_id="person-1",
+        document_id="doc-10",
+        person_name="Арестович",
+        published_date="2023-01-15",
+    )
+
+    assert predictions == []
