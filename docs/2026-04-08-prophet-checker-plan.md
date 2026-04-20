@@ -28,8 +28,7 @@ The plan is split into 5 milestones. Each milestone produces a working, committa
 |-----------|-------|-------------|
 | **M1: Foundation** | 0-4 | GitHub repo, project scaffold, domain models, storage interfaces |
 | **M2: AI Pipeline** | 5-9 | LLM client, prompts, extraction, verification |
-| **M2: AI Pipeline** | 5-9 | LLM client, prompts, extraction, verification |
-| **M2.5: Eval & Data** | 10-14 | Telegram + YouTube data, gold labels, detection eval (P/R/F1), smoke test |
+| **M2.5: Eval & Data** | 10, 12-14 | Telegram data, gold labels, detection eval (P/R/F1), smoke test. *Task 11 (YouTube transcripts) removed 2026-04-20 — MVP scope trimmed to Telegram-only.* |
 | **M3: Orchestration** | 15-16 | Ingestion pipeline, FastAPI app |
 | **M4: Database & Infra** | 17-19 | Docker, Alembic migrations, integration test |
 | **M5: CI & Sources** | 20-22 | GitHub Actions CI, Telegram collector, news collector |
@@ -2476,126 +2475,6 @@ git push
 ```
 
 **🏁 End of Task 10.** STOP. Показати зібрані дані користувачу. Отримати підтвердження перед Task 11.
-
----
-
-## Task 11: Збір транскриптів з YouTube
-
-**Files:**
-- Create: `prediction-tracker/src/prophet_checker/sources/youtube_transcript.py`
-- Create: `prediction-tracker/scripts/collect_youtube_transcripts.py`
-- Create: `prediction-tracker/tests/test_youtube_transcript.py`
-
-**Ціль:** Створити модуль для витягування транскриптів з YouTube відео та їх сегментації на "пости". YouTube ефіри аналітиків (Жданов, Піонтковський) — найбагатше джерело передбачень (~30-50% сегментів містять прогнози vs ~6% у Telegram).
-
-**Залежності:** `youtube-transcript-api`, `yt-dlp`
-
-**Два режими використання:**
-1. **Конкретне відео** — `python -m prophet_checker.sources.youtube_transcript VIDEO_ID` → JSON з сегментами
-2. **Масовий збір** — `python scripts/collect_youtube_transcripts.py` → доповнення `sample_posts.json`
-
-- [ ] **Step 1: Написати тести**
-
-```python
-# tests/test_youtube_transcript.py
-# Тести з моками (не потребують реального YouTube API):
-# - test_segment_transcript — розбиває текст на шматки по N слів
-# - test_segment_preserves_sentences — не ріже посередині речення
-# - test_empty_transcript — повертає [] для порожнього тексту
-# - test_build_post_record — формує правильний dict з id, person_name, published_at, text
-```
-
-- [ ] **Step 2: Реалізувати модуль**
-
-```python
-# src/prophet_checker/sources/youtube_transcript.py
-"""
-Extract and segment YouTube video transcripts.
-
-Usage as module:
-    from prophet_checker.sources.youtube_transcript import YouTubeTranscriptSource
-    source = YouTubeTranscriptSource()
-    segments = await source.fetch_video("VIDEO_ID", person_name="Жданов")
-
-Usage as CLI:
-    python -m prophet_checker.sources.youtube_transcript VIDEO_ID --person "Жданов"
-"""
-
-class YouTubeTranscriptSource:
-    """Fetches transcript from a YouTube video and splits into segments."""
-
-    def __init__(self, segment_words: int = 750, languages: tuple = ("uk", "ru")):
-        ...
-
-    def fetch_video(self, video_id: str, person_name: str, published_date: str | None = None) -> list[dict]:
-        """Fetch transcript and return list of post-like dicts.
-        
-        Returns:
-            [{"id": "yt_{video_id}_{seg_idx}", "person_name": "...", 
-              "published_at": "YYYY-MM-DD", "text": "segment text...", 
-              "source": "youtube", "video_id": "...", "video_title": "..."}]
-        """
-        ...
-
-    def fetch_channel_videos(self, channel_query: str, person_name: str, max_videos: int = 20) -> list[dict]:
-        """Search for videos and fetch transcripts from multiple videos."""
-        ...
-
-    def _get_transcript(self, video_id: str) -> str | None:
-        """Get raw transcript text via youtube-transcript-api."""
-        ...
-
-    def _segment(self, text: str) -> list[str]:
-        """Split transcript into segments of ~segment_words, respecting sentence boundaries."""
-        ...
-
-    def _get_video_metadata(self, video_id: str) -> dict:
-        """Get title and upload date via yt-dlp."""
-        ...
-```
-
-Ключові рішення:
-- **Сегментація по реченнях:** не різати посередині речення — шукати найближчий `.`, `!`, `?` до межі segment_words
-- **750 слів/сегмент** ≈ 5 хвилин ефіру — достатньо контексту для LLM extraction
-- **Мови:** спершу `uk`, потім `ru` fallback (авто-субтитри часто плутають)
-- **Метадані:** зберігати video_id і video_title для traceability
-
-- [ ] **Step 3: Створити скрипт масового збору**
-
-```python
-# scripts/collect_youtube_transcripts.py
-"""
-Collect transcripts from YouTube for prediction dataset.
-Appends to or creates sample_posts.json.
-
-Usage:
-    python scripts/collect_youtube_transcripts.py
-"""
-
-SOURCES = {
-    "Жданов аналітик ефір війна": "Жданов",
-    "Піонтковський прогноз війна": "Піонтковський",
-}
-
-MAX_VIDEOS_PER_SOURCE = 30
-```
-
-- [ ] **Step 4: Запустити збір і валідувати**
-
-Очікуваний результат:
-- ~30 відео × ~10 сегментів = ~300 YouTube-сегментів
-- Додати до існуючих Telegram-постів Арестовича
-- Перевірити що сегменти містять зв'язний текст, не обрізані
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/prophet_checker/sources/youtube_transcript.py tests/test_youtube_transcript.py scripts/collect_youtube_transcripts.py
-git commit -m "feat: add YouTube transcript source for prediction extraction"
-git push
-```
-
-**🏁 End of Task 11.** STOP. Показати статистику зібраних даних (Telegram + YouTube). Отримати підтвердження перед Task 12.
 
 ---
 
