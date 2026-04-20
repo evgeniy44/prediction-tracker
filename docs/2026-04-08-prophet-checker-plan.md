@@ -27,11 +27,13 @@ The plan is split into 5 milestones. Each milestone produces a working, committa
 | Milestone | Tasks | What you get |
 |-----------|-------|-------------|
 | **M1: Foundation** | 0-4 | GitHub repo, project scaffold, domain models, storage interfaces |
-| **M2: AI Pipeline** | 5-9 | LLM client, prompts, source collectors, extraction, verification |
-| **M3: Orchestration** | 10-12 | Ingestion pipeline, FastAPI app, Docker |
-| **M4: Database & Integration** | 13-15 | Alembic migrations, Docker Compose, integration test |
-| **M5: AWS & CI** | 16-18 | GitHub Actions CI, RDS PostgreSQL, EC2 deploy |
-| **M4: Database & Integration** | 13-15 | Alembic migration, integration test, README |
+| **M2: AI Pipeline** | 5-9 | LLM client, prompts, extraction, verification |
+| **M2: AI Pipeline** | 5-9 | LLM client, prompts, extraction, verification |
+| **M2.5: Eval & Data** | 10-14 | Telegram + YouTube data, gold labels, detection eval (P/R/F1), smoke test |
+| **M3: Orchestration** | 15-16 | Ingestion pipeline, FastAPI app |
+| **M4: Database & Infra** | 17-19 | Docker, Alembic migrations, integration test |
+| **M5: CI & Sources** | 20-22 | GitHub Actions CI, Telegram collector, news collector |
+| **M6: AWS Deploy** | 23-24 | RDS PostgreSQL + pgvector, EC2 deploy |
 
 ---
 
@@ -2356,175 +2358,408 @@ git push
 
 ---
 
-## Task 10: Smoke Test — 100 постів через Claude Sonnet 4.6
+## Task 10: Збір реальних постів з Telegram
 
 **Files:**
-- Create: `prediction-tracker/scripts/smoke_test.py`
-- Create: `prediction-tracker/scripts/smoke_results.json` (генерується скриптом)
+- Create: `prediction-tracker/scripts/collect_telegram_posts.py`
+- Create: `prediction-tracker/scripts/sample_posts.json` (генерується скриптом)
 
-**Ціль:** Вперше запустити реальний LLM на живих даних. Перевірити якість extraction промптів на реальному контенті до того як будувати повний pipeline.
+**Ціль:** Зібрати 100 реальних постів з публічних Telegram-каналів українських публічних осіб за допомогою Telethon. Ці дані стануть вхідними для smoke test (Task 11).
 
-- [ ] **Step 1: Підготувати тестові дані**
+**Канали-джерела (публічні):**
+- `@arestovych` — Олексій Арестович
+- `@danilov_mykhailo` — Олексій Данілов (РНБО)
+- `@Podolyak_M` — Михайло Подоляк (ОПУ)
 
-Створити `scripts/sample_posts.json` з 100 реальними постами (або репрезентативними прикладами):
+**Потрібно:**
+- Telegram API credentials (`api_id`, `api_hash`) у `.env`
+- Telethon встановлено у `.venv`
 
-```json
-[
-  {
-    "id": "p1",
-    "person_name": "Арестович",
-    "published_at": "2023-01-15",
-    "text": "Текст посту..."
-  }
-]
-```
-
-- [ ] **Step 2: Створити smoke test скрипт**
+- [ ] **Step 1: Створити скрипт збору**
 
 ```python
-# prediction-tracker/scripts/smoke_test.py
+# prediction-tracker/scripts/collect_telegram_posts.py
 """
-Smoke test: run PredictionExtractor on 100 real posts via Claude Sonnet 4.6.
-Usage: python scripts/smoke_test.py
+Collect real posts from public Telegram channels via Telethon.
+Usage: python scripts/collect_telegram_posts.py
 
-Requires:
-  ANTHROPIC_API_KEY=<key> in environment or .env file
+Requires in .env:
+  TELEGRAM_API_ID=<id>
+  TELEGRAM_API_HASH=<hash>
 """
 import asyncio
 import json
-import os
-import time
 from pathlib import Path
+from datetime import datetime
 
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from telethon import TelegramClient
 
-from prophet_checker.llm.client import LLMClient
-from prophet_checker.analysis.extractor import PredictionExtractor
-from prophet_checker.models.domain import RawDocument, SourceType
-from datetime import datetime
+CHANNELS = {
+    "@arestovych": "Арестович",
+    "@danilov_mykhailo": "Данілов",
+    "@Podolyak_M": "Подоляк",
+}
+POSTS_PER_CHANNEL = 35  # ~100 total
+MIN_TEXT_LENGTH = 50     # skip short/media-only posts
+OUTPUT = Path(__file__).parent / "sample_posts.json"
 
 
 async def main():
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY not set")
+    api_id = int(os.getenv("TELEGRAM_API_ID", 0))
+    api_hash = os.getenv("TELEGRAM_API_HASH", "")
+    if not api_id or not api_hash:
+        raise RuntimeError("Set TELEGRAM_API_ID and TELEGRAM_API_HASH in .env")
 
-    llm = LLMClient(
-        provider="anthropic",
-        model="claude-sonnet-4-6",
-        api_key=api_key,
-        embedding_model="text-embedding-3-small",
-    )
-    extractor = PredictionExtractor(llm_client=llm)
+    client = TelegramClient("scripts/tg_session", api_id, api_hash)
+    await client.start()
 
-    posts_path = Path(__file__).parent / "sample_posts.json"
-    posts = json.loads(posts_path.read_text())[:100]
-
-    results = []
-    total_predictions = 0
-    errors = 0
-    start = time.time()
-
-    for i, post in enumerate(posts, 1):
-        print(f"[{i}/{len(posts)}] Processing post {post['id']}...")
-        try:
-            doc = RawDocument(
-                id=post["id"],
-                person_id="smoke-test",
-                source_type=SourceType.TELEGRAM,
-                url=f"https://t.me/smoke/{post['id']}",
-                published_at=datetime.fromisoformat(post["published_at"]),
-                raw_text=post["text"],
-            )
-            predictions = await extractor.extract(doc, person_name=post["person_name"])
-            results.append({
-                "post_id": post["id"],
-                "text_preview": post["text"][:100],
-                "predictions_found": len(predictions),
-                "predictions": [
-                    {
-                        "claim_text": p.claim_text,
-                        "topic": p.topic,
-                        "prediction_date": str(p.prediction_date),
-                        "target_date": str(p.target_date) if p.target_date else None,
-                    }
-                    for p in predictions
-                ],
+    all_posts = []
+    for channel, person_name in CHANNELS.items():
+        print(f"Collecting from {channel} ({person_name})...")
+        collected = 0
+        async for msg in client.iter_messages(channel, limit=200):
+            if not msg.text or len(msg.text) < MIN_TEXT_LENGTH:
+                continue
+            all_posts.append({
+                "id": f"{channel.strip('@')}_{msg.id}",
+                "person_name": person_name,
+                "published_at": msg.date.strftime("%Y-%m-%d"),
+                "text": msg.text,
             })
-            total_predictions += len(predictions)
-        except Exception as e:
-            print(f"  ERROR: {e}")
-            errors += 1
-            results.append({"post_id": post["id"], "error": str(e)})
+            collected += 1
+            if collected >= POSTS_PER_CHANNEL:
+                break
+        print(f"  Got {collected} posts")
 
-    elapsed = time.time() - start
+    await client.disconnect()
 
-    summary = {
-        "total_posts": len(posts),
-        "total_predictions": total_predictions,
-        "avg_predictions_per_post": round(total_predictions / len(posts), 2),
-        "errors": errors,
-        "elapsed_seconds": round(elapsed, 1),
-        "results": results,
-    }
-
-    output_path = Path(__file__).parent / "smoke_results.json"
-    output_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2))
-
-    print(f"\n✅ Done!")
-    print(f"   Posts processed : {len(posts)}")
-    print(f"   Predictions found: {total_predictions}")
-    print(f"   Avg per post     : {summary['avg_predictions_per_post']}")
-    print(f"   Errors           : {errors}")
-    print(f"   Time             : {elapsed:.1f}s")
-    print(f"   Results saved to : {output_path}")
+    OUTPUT.write_text(json.dumps(all_posts, ensure_ascii=False, indent=2))
+    print(f"\n✅ Saved {len(all_posts)} posts to {OUTPUT}")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-- [ ] **Step 3: Запустити скрипт**
+- [ ] **Step 2: Запустити скрипт**
 
 ```bash
-cd prediction-tracker
 source .venv/bin/activate
-ANTHROPIC_API_KEY=sk-ant-... python scripts/smoke_test.py
+python scripts/collect_telegram_posts.py
 ```
 
-- [ ] **Step 4: Проаналізувати результати**
+При першому запуску Telethon попросить ввести номер телефону і код — це одноразова авторизація, сесія зберігається у `scripts/tg_session.session`.
 
-Переглянути `scripts/smoke_results.json`. Оцінити вручну:
-- Чи коректно витягуються предсказання?
-- Чи є хибнопозитивні (не-предсказання)?
-- Чи є хибнонегативні (пропущені предсказання)?
-- Якість `topic` класифікації
+- [ ] **Step 3: Валідувати зібрані дані**
 
-Якщо якість недостатня — скоригувати `EXTRACTION_TEMPLATE` в `prompts.py` і повторити.
+Перевірити `scripts/sample_posts.json`:
+- Кількість постів (≥80, ціль 100)
+- Розподіл по авторах
+- Мова текстів (більшість — українська)
+- Чи є реальний різноманітний контент (передбачення, коментарі, аналітика)
 
-- [ ] **Step 5: Записати результати в `docs/progress.md`**
-
-Додати в progress.md: кількість постів, кількість знайдених предсказань, estimated cost, час виконання, суб'єктивна оцінка якості.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/smoke_test.py scripts/sample_posts.json
-# smoke_results.json — НЕ комітити (в .gitignore)
-git commit -m "feat: add smoke test script for 100-post extraction via Claude Sonnet 4.6"
+git add scripts/collect_telegram_posts.py
+# sample_posts.json — НЕ комітити (містить чужий контент)
+# tg_session.session — НЕ комітити (в .gitignore)
+echo "scripts/tg_session.session" >> .gitignore
+echo "scripts/sample_posts.json" >> .gitignore
+git commit -m "feat: add Telegram post collection script for smoke test data"
 git push
 ```
 
-**🏁 End of Task 10.** STOP. Проаналізуй результати з користувачем. Отримай явне підтвердження перед Task 11.
+**🏁 End of Task 10.** STOP. Показати зібрані дані користувачу. Отримати підтвердження перед Task 11.
 
 ---
 
-## Task 11: Ingestion Pipeline Orchestrator
+## Task 11: Збір транскриптів з YouTube
+
+**Files:**
+- Create: `prediction-tracker/src/prophet_checker/sources/youtube_transcript.py`
+- Create: `prediction-tracker/scripts/collect_youtube_transcripts.py`
+- Create: `prediction-tracker/tests/test_youtube_transcript.py`
+
+**Ціль:** Створити модуль для витягування транскриптів з YouTube відео та їх сегментації на "пости". YouTube ефіри аналітиків (Жданов, Піонтковський) — найбагатше джерело передбачень (~30-50% сегментів містять прогнози vs ~6% у Telegram).
+
+**Залежності:** `youtube-transcript-api`, `yt-dlp`
+
+**Два режими використання:**
+1. **Конкретне відео** — `python -m prophet_checker.sources.youtube_transcript VIDEO_ID` → JSON з сегментами
+2. **Масовий збір** — `python scripts/collect_youtube_transcripts.py` → доповнення `sample_posts.json`
+
+- [ ] **Step 1: Написати тести**
+
+```python
+# tests/test_youtube_transcript.py
+# Тести з моками (не потребують реального YouTube API):
+# - test_segment_transcript — розбиває текст на шматки по N слів
+# - test_segment_preserves_sentences — не ріже посередині речення
+# - test_empty_transcript — повертає [] для порожнього тексту
+# - test_build_post_record — формує правильний dict з id, person_name, published_at, text
+```
+
+- [ ] **Step 2: Реалізувати модуль**
+
+```python
+# src/prophet_checker/sources/youtube_transcript.py
+"""
+Extract and segment YouTube video transcripts.
+
+Usage as module:
+    from prophet_checker.sources.youtube_transcript import YouTubeTranscriptSource
+    source = YouTubeTranscriptSource()
+    segments = await source.fetch_video("VIDEO_ID", person_name="Жданов")
+
+Usage as CLI:
+    python -m prophet_checker.sources.youtube_transcript VIDEO_ID --person "Жданов"
+"""
+
+class YouTubeTranscriptSource:
+    """Fetches transcript from a YouTube video and splits into segments."""
+
+    def __init__(self, segment_words: int = 750, languages: tuple = ("uk", "ru")):
+        ...
+
+    def fetch_video(self, video_id: str, person_name: str, published_date: str | None = None) -> list[dict]:
+        """Fetch transcript and return list of post-like dicts.
+        
+        Returns:
+            [{"id": "yt_{video_id}_{seg_idx}", "person_name": "...", 
+              "published_at": "YYYY-MM-DD", "text": "segment text...", 
+              "source": "youtube", "video_id": "...", "video_title": "..."}]
+        """
+        ...
+
+    def fetch_channel_videos(self, channel_query: str, person_name: str, max_videos: int = 20) -> list[dict]:
+        """Search for videos and fetch transcripts from multiple videos."""
+        ...
+
+    def _get_transcript(self, video_id: str) -> str | None:
+        """Get raw transcript text via youtube-transcript-api."""
+        ...
+
+    def _segment(self, text: str) -> list[str]:
+        """Split transcript into segments of ~segment_words, respecting sentence boundaries."""
+        ...
+
+    def _get_video_metadata(self, video_id: str) -> dict:
+        """Get title and upload date via yt-dlp."""
+        ...
+```
+
+Ключові рішення:
+- **Сегментація по реченнях:** не різати посередині речення — шукати найближчий `.`, `!`, `?` до межі segment_words
+- **750 слів/сегмент** ≈ 5 хвилин ефіру — достатньо контексту для LLM extraction
+- **Мови:** спершу `uk`, потім `ru` fallback (авто-субтитри часто плутають)
+- **Метадані:** зберігати video_id і video_title для traceability
+
+- [ ] **Step 3: Створити скрипт масового збору**
+
+```python
+# scripts/collect_youtube_transcripts.py
+"""
+Collect transcripts from YouTube for prediction dataset.
+Appends to or creates sample_posts.json.
+
+Usage:
+    python scripts/collect_youtube_transcripts.py
+"""
+
+SOURCES = {
+    "Жданов аналітик ефір війна": "Жданов",
+    "Піонтковський прогноз війна": "Піонтковський",
+}
+
+MAX_VIDEOS_PER_SOURCE = 30
+```
+
+- [ ] **Step 4: Запустити збір і валідувати**
+
+Очікуваний результат:
+- ~30 відео × ~10 сегментів = ~300 YouTube-сегментів
+- Додати до існуючих Telegram-постів Арестовича
+- Перевірити що сегменти містять зв'язний текст, не обрізані
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/prophet_checker/sources/youtube_transcript.py tests/test_youtube_transcript.py scripts/collect_youtube_transcripts.py
+git commit -m "feat: add YouTube transcript source for prediction extraction"
+git push
+```
+
+**🏁 End of Task 11.** STOP. Показати статистику зібраних даних (Telegram + YouTube). Отримати підтвердження перед Task 12.
+
+---
+
+## Task 12: Gold Labels — ручна розмітка 50 постів
+
+**Files:**
+- Create: `prediction-tracker/docs/annotation-guidelines.md`
+- Create: `prediction-tracker/scripts/annotate.py` — допоміжний скрипт для розмітки
+- Create: `prediction-tracker/scripts/gold_labels.json` (результат розмітки)
+
+**Ціль:** Створити ground truth для оцінки якості detection. Рівень 1 — binary classification: чи є в тексті хоча б одне передбачення (YES/NO).
+
+- [ ] **Step 1: Написати Annotation Guidelines**
+
+`docs/annotation-guidelines.md` — чіткі правила розмітки щоб забезпечити послідовність:
+
+**YES (є передбачення):**
+- Конкретне твердження про майбутню подію ("Війна закінчиться до кінця 2023")
+- Прогноз з приблизною датою ("Контрнаступ почнеться влітку")
+- Прогноз без дати, але верифікований ("Росія програє цю війну" — можна перевірити пост-фактум)
+
+**NO (нема передбачення):**
+- Констатація факту ("Сьогодні обстріляли Харків")
+- Думка/оцінка без елементу майбутнього ("Це була помилка командування")
+- Намір ("Ми будемо боротись до перемоги")
+- Умовне без конкретики ("Якщо дадуть зброю — переможемо")
+- Риторичне ("Хто міг подумати?")
+
+**Edge cases:**
+- "Думаю, переговори можливі" → NO (занадто розмито)
+- "Рубль впаде до 100 за долар" → YES (конкретне, верифіковне)
+- "Ми підготовлені краще ніж рік тому" → NO (оцінка теперішнього)
+
+- [ ] **Step 2: Вибрати 50 постів для розмітки**
+
+Рандомна вибірка з `sample_posts.json` (seed=42) — стратифікована по авторах (~17 на канал).
+
+- [ ] **Step 3: Розмітка**
+
+Показати користувачу пости пачками по 10. Для кожного — текст (перші 300 символів) та питання: YES чи NO? Зберегти результат у `scripts/gold_labels.json`:
+
+```json
+[
+  {"id": "arestovych_1234", "has_prediction": true},
+  {"id": "arestovych_1235", "has_prediction": false}
+]
+```
+
+- [ ] **Step 4: Статистика розмітки**
+
+Порахувати:
+- Всього розмічено: 50
+- YES: N (X%)
+- NO: N (X%)
+- Розподіл по авторах
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add docs/annotation-guidelines.md scripts/annotate.py
+# gold_labels.json — НЕ комітити (в .gitignore, містить суб'єктивні дані)
+git commit -m "feat: add annotation guidelines and labeling script for detection eval"
+git push
+```
+
+**🏁 End of Task 12.** STOP. Показати статистику розмітки. Отримати підтвердження перед Task 13.
+
+---
+
+## Task 13: Detection Evaluation — precision/recall/F1
+
+**Files:**
+- Create: `prediction-tracker/scripts/evaluate_detection.py`
+- Create: `prediction-tracker/scripts/detection_results.json` (генерується)
+
+**Ціль:** Прогнати detection (LLM extraction) на 50 розмічених постах і виміряти precision/recall/F1 проти gold labels.
+
+- [ ] **Step 1: Створити evaluation скрипт**
+
+`scripts/evaluate_detection.py`:
+1. Завантажити `gold_labels.json` і відповідні пости з `sample_posts.json`
+2. Для кожного поста: викликати PredictionExtractor
+3. Бінарний результат: `predictions_found > 0` → YES, інакше → NO
+4. Порівняти з gold label
+5. Порахувати: TP, FP, FN, TN, precision, recall, F1
+6. Зберегти повний звіт + список всіх FP і FN для аналізу
+
+Вихід — `scripts/detection_results.json`:
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "total": 50,
+  "precision": 0.85,
+  "recall": 0.92,
+  "f1": 0.88,
+  "confusion": {"TP": 22, "FP": 4, "FN": 2, "TN": 22},
+  "false_positives": [{"id": "...", "text_preview": "...", "predictions": [...]}],
+  "false_negatives": [{"id": "...", "text_preview": "..."}]
+}
+```
+
+- [ ] **Step 2: Запустити evaluation**
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... python scripts/evaluate_detection.py
+```
+
+Вартість: ~50 постів × ~$0.005 = ~$0.25 (тільки 50 постів, не всі 1049).
+
+- [ ] **Step 3: Error analysis**
+
+Переглянути FP і FN:
+- **FP (false positive):** LLM побачив prediction де його нема → уточнити промпт
+- **FN (false negative):** LLM пропустив prediction → розширити промпт або знизити поріг
+
+- [ ] **Step 4: (Опціонально) Ітерація промптів**
+
+Якщо F1 < 0.80:
+1. Скоригувати `EXTRACTION_TEMPLATE` / `EXTRACTION_SYSTEM` в `prompts.py`
+2. Повторити evaluation
+3. Порівняти F1 до і після
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add scripts/evaluate_detection.py
+git commit -m "feat: add detection evaluation script with precision/recall/F1"
+git push
+```
+
+**🏁 End of Task 13.** STOP. Показати precision/recall/F1 та error analysis. Отримати підтвердження перед Task 14.
+
+---
+
+## Task 14: Smoke Test — extraction на повному датасеті
+
+**Files:**
+- Create: `prediction-tracker/scripts/smoke_test.py`
+- Create: `prediction-tracker/scripts/smoke_results.json` (генерується)
+
+**Ціль:** Запустити PredictionExtractor на всіх 1049 постах. Після того як detection якість підтверджена на 50 постах — масштабний прогін.
+
+**Вхідні дані:** `scripts/sample_posts.json` (1049 постів, Task 10)
+
+**Вибір моделі:** Визначається за результатами Task 12 (якість vs вартість).
+
+- [ ] **Step 1: Створити smoke test скрипт**
+
+`scripts/smoke_test.py`:
+1. Зчитати всі пости з `sample_posts.json`
+2. Для кожного: викликати PredictionExtractor (без embeddings для економії)
+3. Зберегти результати: post_id, predictions_found, claims, topics
+4. Вивести статистику: total posts, total predictions, avg per post, errors, time, estimated cost
+
+- [ ] **Step 2: Запустити**
+- [ ] **Step 3: Проаналізувати результати**
+- [ ] **Step 4: Записати висновки в `docs/progress.md`**
+- [ ] **Step 5: Commit**
+
+**🏁 End of Task 14.** STOP. Проаналізуй результати з користувачем. Отримай явне підтвердження перед Task 15.
+
+---
+
+## Task 15: Ingestion Pipeline Orchestrator
 
 
 **Files:**
@@ -2762,11 +2997,11 @@ git commit -m "feat: add IngestionPipeline orchestrator for collection + extract
 git push
 ```
 
-**🏁 End of Task 12. Milestone M3 complete!** STOP. Show summary to user. Wait for explicit approval before M4.
+**🏁 End of Task 15.** STOP. Show summary to user. Wait for explicit approval before Task 16.
 
 ---
 
-## Task 12: FastAPI Application Entry Point
+## Task 16: FastAPI Application Entry Point
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/main.py`
@@ -2819,11 +3054,11 @@ git commit -m "feat: add FastAPI entry point with health endpoint"
 git push
 ```
 
-**🏁 End of Task 13.** STOP. Show summary to user. Wait for explicit approval before Task 14.
+**🏁 End of Task 16. Milestone M3 complete!** STOP. Show summary to user. Wait for explicit approval before M4.
 
 ---
 
-## Task 13: Docker + Docker Compose
+## Task 17: Docker + Docker Compose
 
 **Files:**
 - Create: `prediction-tracker/Dockerfile`
@@ -2910,11 +3145,11 @@ git commit -m "feat: add Docker and docker-compose with pgvector"
 git push
 ```
 
-**🏁 End of Task 14.** STOP. Show summary to user. Wait for explicit approval before Task 15.
+**🏁 End of Task 17.** STOP. Show summary to user. Wait for explicit approval before Task 18.
 
 ---
 
-## Task 14: Run Alembic Migration
+## Task 18: Run Alembic Migration
 
 **Files:**
 - Modify: `prediction-tracker/alembic.ini` (URL from env)
@@ -2961,7 +3196,7 @@ git push
 
 ---
 
-## Task 15: Integration Smoke Test
+## Task 19: Integration Smoke Test
 
 **Files:**
 - Create: `prediction-tracker/tests/test_integration.py`
@@ -3073,11 +3308,11 @@ git commit -m "test: add integration smoke test for full storage round trip"
 git push
 ```
 
-**🏁 End of Task 15. Milestone M4 complete!** STOP. Show summary to user. Wait for explicit approval before M5.
+**🏁 End of Task 19. Milestone M4 complete!** STOP. Show summary to user. Wait for explicit approval before M5.
 
 ---
 
-## Task 16: GitHub Actions CI
+## Task 20: GitHub Actions CI
 
 **Files:**
 - Create: `prediction-tracker/.github/workflows/ci.yml`
@@ -3161,11 +3396,11 @@ git commit -m "docs: add CI badge to README"
 git push
 ```
 
-**🏁 End of Task 16.** STOP. Show summary to user. Wait for explicit approval before Task 17.
+**🏁 End of Task 20.** STOP. Show summary to user. Wait for explicit approval before Task 21.
 
 ---
 
-## Task 17: Source Interface + Telegram Collector
+## Task 21: Source Interface + Telegram Collector
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/sources/__init__.py`
@@ -3237,11 +3472,11 @@ async def test_telegram_collector_skips_empty_messages():
 - [ ] **Step 4: Run tests to verify they pass**
 - [ ] **Step 5: Commit**
 
-**🏁 End of Task 16.** STOP. Show summary to user. Wait for explicit approval before Task 17.
+**🏁 End of Task 21.** STOP. Show summary to user. Wait for explicit approval before Task 22.
 
 ---
 
-## Task 18: News Collector
+## Task 22: News Collector
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/sources/news_collector.py`
@@ -3253,11 +3488,11 @@ async def test_telegram_collector_skips_empty_messages():
 - [ ] **Step 4: Run tests to verify they pass**
 - [ ] **Step 5: Commit**
 
-**🏁 End of Task 17.** STOP. Show summary to user. Wait for explicit approval before Task 18.
+**🏁 End of Task 22.** STOP. Show summary to user. Wait for explicit approval before Task 23.
 
 ---
 
-## Task 19: AWS RDS PostgreSQL + pgvector
+## Task 23: AWS RDS PostgreSQL + pgvector
 
 **Files:**
 - Create: `prediction-tracker/infra/setup-rds.sh`
@@ -3350,11 +3585,11 @@ git commit -m "infra: add RDS setup script for PostgreSQL + pgvector"
 git push
 ```
 
-**🏁 End of Task 17.** STOP. Show summary to user. Wait for explicit approval before Task 18.
+**🏁 End of Task 23.** STOP. Show summary to user. Wait for explicit approval before Task 24.
 
 ---
 
-## Task 20: AWS EC2 + Deploy
+## Task 24: AWS EC2 + Deploy
 
 **Files:**
 - Create: `prediction-tracker/infra/setup-ec2.sh`
@@ -3529,7 +3764,7 @@ git commit -m "infra: add EC2 setup and deploy scripts, production compose"
 git push
 ```
 
-**🏁 End of Task 18. Milestone M5 complete! App is live!** STOP. Show final summary to user.
+**🏁 End of Task 24. Milestone M6 complete! App is live!** STOP. Show final summary to user.
 
 ---
 

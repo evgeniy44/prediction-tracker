@@ -33,12 +33,12 @@ from telethon.errors import (
 
 # ── Config ──────────────────────────────────────────────────────────
 CHANNELS = {
-    "O_Arestovich_official": "Арестович",
-    "dmytrogordon_official": "Гордон",
-    "M_Podolyak": "Подоляк",
+    "O_Arestovich_official": "Арестович"
+    # "OleksandrZhdanov": "Жданов",
+    # "andaboronin": "Піонтковський",
 }
 
-POSTS_PER_CHANNEL = 350      # aim for ~1000 total
+POSTS_PER_CHANNEL = 20000      # aim for ~1000 total
 MIN_TEXT_LENGTH = 80         # skip very short / media-only posts
 
 # Collect from the very beginning (2012+) up to end of 2025
@@ -48,7 +48,7 @@ DATE_TO   = datetime(2026, 1, 1, tzinfo=timezone.utc)
 # To get even distribution across years we scan the full history
 # and sample evenly afterwards
 EVEN_SAMPLE = True
-OUTPUT = Path(__file__).parent / "sample_posts.json"
+OUTPUT = Path(__file__).parent / "arestovich/all.json"
 SESSION_PATH = str(Path(__file__).parent / "tg_session")
 
 
