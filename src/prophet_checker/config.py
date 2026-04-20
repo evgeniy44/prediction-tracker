@@ -12,7 +12,11 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     verification_confidence_threshold: float = 0.6
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",  # allow eval-only vars (ANTHROPIC_API_KEY etc.) without schema bloat
+    }
 
 
 def get_settings() -> Settings:

@@ -47,6 +47,29 @@ def test_parse_extraction_response_invalid_json():
     assert predictions == []
 
 
+def test_parse_extraction_response_strips_markdown_code_fence():
+    """LLMs often wrap JSON in ```json ... ``` fences — parser must handle it."""
+    response = '```json\n{"predictions": [{"claim_text": "test", "prediction_date": "2024-01-01", "target_date": null, "topic": "війна"}]}\n```'
+    predictions = parse_extraction_response(response)
+    assert len(predictions) == 1
+    assert predictions[0]["claim_text"] == "test"
+
+
+def test_parse_extraction_response_strips_bare_code_fence():
+    """Some models use ``` without language tag — must also be stripped."""
+    response = '```\n{"predictions": [{"claim_text": "bare fence", "prediction_date": "2024-01-01", "target_date": null, "topic": ""}]}\n```'
+    predictions = parse_extraction_response(response)
+    assert len(predictions) == 1
+    assert predictions[0]["claim_text"] == "bare fence"
+
+
+def test_parse_extraction_response_handles_leading_trailing_whitespace():
+    """Model may add blank lines around JSON — parser must tolerate."""
+    response = '\n\n  {"predictions": [{"claim_text": "test", "prediction_date": "2024-01-01", "target_date": null, "topic": ""}]}  \n\n'
+    predictions = parse_extraction_response(response)
+    assert len(predictions) == 1
+
+
 def test_build_verification_prompt():
     prompt = build_verification_prompt(
         claim="Контрнаступ почнеться влітку 2023",

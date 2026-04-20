@@ -1,12 +1,62 @@
 from __future__ import annotations
 
 import json
+import re
+
+# Models often wrap JSON in markdown code fences: ```json ... ``` or ``` ... ```.
+# This regex captures the JSON body between fences (optional language tag).
+_CODE_FENCE_RE = re.compile(
+    r"^\s*```(?:json|JSON)?\s*\n?(.*?)\n?\s*```\s*$",
+    re.DOTALL,
+)
 
 
-EXTRACTION_SYSTEM = """You are an expert analyst who identifies predictions and forecasts in Ukrainian political commentary.
-Extract specific, verifiable predictions from the given text.
-A prediction is a statement about future events that can be verified as true or false.
-Respond ONLY with valid JSON."""
+def _strip_code_fence(text: str) -> str:
+    """Strip markdown code fences if present. Preserves content otherwise."""
+    match = _CODE_FENCE_RE.match(text.strip())
+    if match:
+        return match.group(1).strip()
+    return text.strip()
+
+
+EXTRACTION_SYSTEM = """You are an expert analyst who identifies VERIFIABLE predictions in Ukrainian/Russian political commentary.
+
+A prediction must satisfy ALL three criteria:
+1. Refers to a FUTURE event or state (not present assessment, not past event)
+2. Has a VERIFIABLE OUTCOME — a concrete condition that can be objectively checked as true or false later
+3. Concerns EXTERNAL events (politics, war, economy, people, institutions) — NOT the author's own scheduled activities
+
+Do NOT extract these (they superficially look like predictions but fail criteria above):
+
+A. Slogans / rhetorical declarations without measurable outcomes:
+   - "Перемога буде за нами" — no criterion for "перемога"
+   - "Військові злочинці понесуть відповідальність" — no timeframe, no specific persons
+   - "Грузія буде вільною" — no definition of "вільна"
+
+B. Author's own event announcements (about the author's broadcasts, courses, books, trips):
+   - "Завтра о 22:00 проведемо ефір з Фельдманом"
+   - "15 листопада виходить друга частина аудіокниги"
+   - "На вихідних запускаємо новий модуль «Семантика»"
+
+C. Normative statements (describe what SHOULD happen, not what WILL):
+   - "Потрібно посилити санкції" — prescription, not forecast
+   - "Україна має змінити стратегію" — advocacy
+   - "Слід негайно зупинити корупцію" — demand
+
+D. Vague forward statements without concrete criteria:
+   - "Найближчі тижні будуть переломними" — what counts as "переломні"?
+   - "Ситуація скоро зміниться" — no direction, no threshold
+   - "Щось обов'язково станеться" — tautology
+
+E. Analysis of present state or past events, even if phrased with future-tense verbs for rhetorical effect:
+   - "Ми вже бачимо деморалізацію ворога" — observation of now
+   - "Ця війна вже змінила світ" — retrospective
+
+F. Questions, calls to action, metaphors, sarcasm — these are not claims.
+
+Verification test: ask "Could an impartial fact-checker in 1 year objectively confirm or refute this specific statement?" If the answer requires interpretation of vague terms — it's NOT a prediction.
+
+Respond ONLY with raw JSON — do NOT wrap in markdown code fences."""
 
 EXTRACTION_TEMPLATE = """Analyze the following text by {person_name} (published on {published_date}).
 Extract all predictions — statements about future events that can later be verified.
@@ -30,7 +80,7 @@ If no predictions found, respond: {{"predictions": []}}"""
 
 VERIFICATION_SYSTEM = """You are a fact-checker who verifies predictions against known events.
 You must provide evidence for your verdict. If you cannot find clear evidence, mark as unresolved.
-Respond ONLY with valid JSON."""
+Respond ONLY with raw JSON — do NOT wrap in markdown code fences (no ```json, no ``` wrappers)."""
 
 VERIFICATION_TEMPLATE = """Verify the following prediction:
 
@@ -91,19 +141,19 @@ def build_rag_prompt(question: str, predictions_context: list[dict]) -> str:
 
 def parse_extraction_response(response: str) -> list[dict]:
     try:
-        data = json.loads(response)
+        data = json.loads(_strip_code_fence(response))
         return data.get("predictions", [])
-    except (json.JSONDecodeError, AttributeError):
+    except (json.JSONDecodeError, AttributeError, TypeError):
         return []
 
 
 def parse_verification_response(response: str) -> dict | None:
     try:
-        data = json.loads(response)
+        data = json.loads(_strip_code_fence(response))
         if "status" in data and "confidence" in data:
             return data
         return None
-    except (json.JSONDecodeError, AttributeError):
+    except (json.JSONDecodeError, AttributeError, TypeError):
         return None
 
 
