@@ -140,9 +140,14 @@ def parse_judge_response(response: str) -> dict:
     Unknown verdict values are preserved with `verdict_invalid: True` flag,
     so the aggregator can count them separately. Malformed JSON returns
     empty lists with parse_error populated.
+
+    Uses `raw_decode` to gracefully accept the first valid JSON object
+    even when the model emits trailing text or a second JSON block
+    (observed with Opus 4.6 ~10% of the time on edge cases).
     """
+    text = _strip_code_fence(response)
     try:
-        data = json.loads(_strip_code_fence(response))
+        data, _consumed = json.JSONDecoder().raw_decode(text)
     except (json.JSONDecodeError, AttributeError, TypeError) as e:
         return {
             "per_claim": [],

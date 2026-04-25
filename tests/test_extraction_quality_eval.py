@@ -165,6 +165,27 @@ def test_parse_judge_response_missing_top_level_keys_defaults_empty():
     assert len(parsed["per_claim"]) == 1
 
 
+def test_parse_judge_response_handles_trailing_data():
+    """Opus 4.6 sometimes emits trailing text or a 2nd JSON object after the
+    main response. raw_decode reads only the first valid JSON and ignores rest.
+    Without this fix, ~10% of Opus calls fail with 'Extra data' JSONDecodeError.
+    """
+    primary = json.dumps(
+        {
+            "per_claim": [
+                {"claim_text": "X", "verdict": "exact_match", "reasoning": "ok"}
+            ],
+            "missed_predictions": [],
+        }
+    )
+    # Append a trailing explanation block (mimics observed Opus output)
+    response = primary + "\n\nNote: I judged this confidently."
+    parsed = parse_judge_response(response)
+    assert parsed["parse_error"] is None
+    assert len(parsed["per_claim"]) == 1
+    assert parsed["per_claim"][0]["verdict"] == "exact_match"
+
+
 # =============================================================================
 # Group A3 — aggregate_metrics
 # =============================================================================
