@@ -141,11 +141,17 @@ def parse_judge_response(response: str) -> dict:
     so the aggregator can count them separately. Malformed JSON returns
     empty lists with parse_error populated.
 
-    Uses `raw_decode` to gracefully accept the first valid JSON object
-    even when the model emits trailing text or a second JSON block
-    (observed with Opus 4.6 ~10% of the time on edge cases).
+    Tolerates two real-world Opus 4.6 output deviations from raw JSON:
+        1. Markdown code fences (```json ... ```)
+        2. Leading preamble text before the JSON object
+        3. Trailing explanation text after the JSON object
+    Strategy: strip fences → find first `{` → use raw_decode from there.
     """
     text = _strip_code_fence(response)
+    # Skip any leading non-JSON text — find the first `{`
+    first_brace = text.find("{")
+    if first_brace > 0:
+        text = text[first_brace:]
     try:
         data, _consumed = json.JSONDecoder().raw_decode(text)
     except (json.JSONDecodeError, AttributeError, TypeError) as e:

@@ -186,6 +186,25 @@ def test_parse_judge_response_handles_trailing_data():
     assert parsed["per_claim"][0]["verdict"] == "exact_match"
 
 
+def test_parse_judge_response_handles_leading_preamble():
+    """Opus 4.6 occasionally adds a preamble like 'Here is my evaluation:' before
+    the JSON. parse strips leading non-JSON text by finding the first `{`.
+    """
+    primary = json.dumps(
+        {
+            "per_claim": [
+                {"claim_text": "Y", "verdict": "faithful_paraphrase", "reasoning": "ok"}
+            ],
+            "missed_predictions": [],
+        }
+    )
+    response = "Here is my evaluation of the extracted claims:\n\n" + primary
+    parsed = parse_judge_response(response)
+    assert parsed["parse_error"] is None
+    assert len(parsed["per_claim"]) == 1
+    assert parsed["per_claim"][0]["verdict"] == "faithful_paraphrase"
+
+
 # =============================================================================
 # Group A3 — aggregate_metrics
 # =============================================================================
