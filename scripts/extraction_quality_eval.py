@@ -6,14 +6,21 @@ See spec: docs/2026-04-21-extraction-quality-eval-design.md
 """
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import logging
+import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from extraction_judge_prompts import (
+# Add src/ to path so we can import LLMClient for the judge factory.
+# (scripts/ is already on sys.path implicitly when running this file directly.)
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from extraction_judge_prompts import (  # noqa: E402
     JUDGE_SYSTEM,
     VERDICT_ORDINAL,
     VERDICT_VALUES,
@@ -22,6 +29,15 @@ from extraction_judge_prompts import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Import Task 13 evaluation harness components — reused without modification
+from evaluate_detection import (  # noqa: E402
+    CONCURRENCY_OVERRIDES,
+    MIN_CALL_INTERVAL_SECONDS,
+    PROVIDER_API_KEY_ENV,
+    _default_extractor_factory,
+)
+from prophet_checker.llm.client import LLMClient  # noqa: E402
 
 
 # =============================================================================
@@ -357,3 +373,185 @@ def run_stage3_aggregate(
         json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return report
+
+
+# =============================================================================
+# CLI orchestration
+# =============================================================================
+
+
+PRIMARY_EXTRACTORS: tuple[str, ...] = (
+    "gemini/gemini-3.1-flash-lite-preview",
+    "deepseek/deepseek-chat",
+    "anthropic/claude-sonnet-4-6",
+)
+DEFAULT_JUDGE = "anthropic/claude-opus-4-6"
+
+PROJECT_ROOT = Path(__file__).parent.parent
+DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "gold_labels.json"
+DEFAULT_POSTS_PATH = PROJECT_ROOT / "scripts" / "sample_posts.json"
+
+
+def _judge_factory(model_id: str) -> LLMClient:
+    """Build LLMClient for the judge model.
+
+    Reuses provider/key wiring conventions from Task 13's _default_extractor_factory
+    but returns a bare LLMClient (no PredictionExtractor wrapper — judge calls
+    .complete directly without embedding any predictions).
+    """
+    if "/" not in model_id:
+        raise ValueError(
+            f"judge model_id must be 'provider/model', got {model_id!r}"
+        )
+    provider, model = model_id.split("/", 1)
+    if provider not in PROVIDER_API_KEY_ENV:
+        raise ValueError(f"Unknown provider for judge: {provider!r}")
+    api_key = os.environ.get(PROVIDER_API_KEY_ENV[provider])
+    if not api_key:
+        raise RuntimeError(
+            f"Missing API key for judge provider {provider!r}: "
+            f"set env var {PROVIDER_API_KEY_ENV[provider]}"
+        )
+    return LLMClient(
+        provider=provider, model=model, api_key=api_key, temperature=0.0
+    )
+
+
+def _parse_stages(s: str) -> set[int]:
+    return {int(x.strip()) for x in s.split(",") if x.strip()}
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Task 13.5 — Extraction Quality Evaluation (LLM-as-judge)"
+    )
+    parser.add_argument(
+        "--stages",
+        default="1,2,3",
+        help="Comma-separated stage numbers to run (default: 1,2,3)",
+    )
+    parser.add_argument(
+        "--extractors",
+        default=",".join(PRIMARY_EXTRACTORS),
+        help="Comma-separated extractor model IDs",
+    )
+    parser.add_argument(
+        "--judge", default=DEFAULT_JUDGE, help="Judge model ID"
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=str(PROJECT_ROOT / "scripts"),
+        help="Where to write JSON artifacts",
+    )
+    parser.add_argument(
+        "--gold",
+        default=str(DEFAULT_GOLD_PATH),
+        help="Path to gold_labels.json",
+    )
+    parser.add_argument(
+        "--posts",
+        default=str(DEFAULT_POSTS_PATH),
+        help="Path to sample_posts.json",
+    )
+    parser.add_argument(
+        "--author",
+        default="Арестович",
+        help="Filter posts by person_name",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Limit posts processed (for dry run / debugging)",
+    )
+    return parser
+
+
+async def _main_async(args: argparse.Namespace) -> None:
+    stages = _parse_stages(args.stages)
+    out_dir = Path(args.output_dir)
+    extractors = [e.strip() for e in args.extractors.split(",") if e.strip()]
+    extractions_path = out_dir / "extraction_outputs.json"
+    judgements_path = out_dir / "extraction_judgements.json"
+    report_path = out_dir / "extraction_eval_report.json"
+
+    if 1 in stages:
+        posts = json.loads(Path(args.posts).read_text(encoding="utf-8"))
+        if args.limit is not None:
+            posts = [p for p in posts if p["person_name"] == args.author][
+                : args.limit
+            ]
+            print(f"  (limit={args.limit}: subset to {len(posts)} posts)")
+        print(
+            f"Stage 1: extracting with {len(extractors)} models "
+            f"on {args.author} posts"
+        )
+        await run_stage1_extraction(
+            extractors=extractors,
+            posts=posts,
+            author_filter=args.author,
+            output_path=extractions_path,
+            extractor_factory=_default_extractor_factory,
+        )
+        print(f"  ✓ saved {extractions_path}")
+
+    if 2 in stages:
+        posts = json.loads(Path(args.posts).read_text(encoding="utf-8"))
+        if args.limit is not None:
+            posts = [p for p in posts if p["person_name"] == args.author][
+                : args.limit
+            ]
+        # Per-judge concurrency override (Opus paid tier supports higher concurrency)
+        concurrency = CONCURRENCY_OVERRIDES.get(args.judge, 3)
+        min_interval = MIN_CALL_INTERVAL_SECONDS.get(args.judge, 0.0)
+        print(
+            f"Stage 2: judging with {args.judge} (concurrency={concurrency})"
+        )
+        await run_stage2_judge(
+            judge_model=args.judge,
+            extractions_path=extractions_path,
+            posts=posts,
+            output_path=judgements_path,
+            judge_factory=_judge_factory,
+            concurrency=concurrency,
+            min_call_interval_seconds=min_interval,
+        )
+        print(f"  ✓ saved {judgements_path}")
+
+    if 3 in stages:
+        print("Stage 3: aggregating metrics")
+        report = run_stage3_aggregate(
+            judgements_path=judgements_path,
+            gold_labels_path=Path(args.gold),
+            output_path=report_path,
+        )
+        _print_report_table(report)
+        print(f"  ✓ saved {report_path}")
+
+
+def _print_report_table(report: dict) -> None:
+    print("\n" + "=" * 92)
+    print(
+        f"{'Model':<48} {'avg_score':>10} {'hall_rate':>10} {'missed':>8} {'claims':>7}"
+    )
+    print("-" * 92)
+    for m, mr in report["per_model"].items():
+        print(
+            f"{m:<48} "
+            f"{mr['avg_quality_score']:>10.3f} "
+            f"{mr['hallucination_rate']:>10.3f} "
+            f"{mr['missed_predictions_count']:>8} "
+            f"{mr['total_claims']:>7}"
+        )
+    print("=" * 92)
+
+
+def main() -> None:
+    parser = _build_arg_parser()
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.WARNING)
+    asyncio.run(_main_async(args))
+
+
+if __name__ == "__main__":
+    main()

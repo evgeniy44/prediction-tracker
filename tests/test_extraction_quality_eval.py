@@ -669,3 +669,36 @@ def test_stage3_aggregate_writes_report_with_per_model_section(tmp_path):
     assert "per_model" in report
     assert report["per_model"]["model_a"]["total_claims"] == 1
     assert report["per_model"]["model_a"]["avg_quality_score"] == pytest.approx(3.0)
+
+
+# =============================================================================
+# Group C1 — CLI smoke
+# =============================================================================
+
+
+def test_cli_help_lists_stage_argument():
+    """CLI --help mentions --stages, --judge, --extractors, --output-dir."""
+    from extraction_quality_eval import _build_arg_parser
+
+    parser = _build_arg_parser()
+    out = parser.format_help()
+    assert "--stages" in out
+    assert "--judge" in out
+    assert "--extractors" in out
+    assert "--output-dir" in out
+
+
+def test_cli_parses_stages_csv():
+    from extraction_quality_eval import _build_arg_parser, _parse_stages
+
+    args = _build_arg_parser().parse_args(["--stages", "1,3"])
+    assert _parse_stages(args.stages) == {1, 3}
+
+
+def test_cli_parses_extractors_csv():
+    from extraction_quality_eval import _build_arg_parser
+
+    args = _build_arg_parser().parse_args(
+        ["--extractors", "gemini/x,deepseek/y"]
+    )
+    assert args.extractors == "gemini/x,deepseek/y"
