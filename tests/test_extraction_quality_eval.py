@@ -80,3 +80,86 @@ def test_build_judge_prompt_handles_empty_claims():
         post_text="some post", published_date="2024-01-01", extracted_claims=[]
     )
     assert "no claims" in prompt.lower() or "empty" in prompt.lower() or "0" in prompt
+
+
+# =============================================================================
+# Group A2 — parse_judge_response
+# =============================================================================
+
+
+from extraction_judge_prompts import parse_judge_response
+
+
+def test_parse_judge_response_valid_json():
+    """Standard well-formed JSON response is parsed into structured dict."""
+    response = json.dumps(
+        {
+            "per_claim": [
+                {
+                    "claim_text": "X buy Y",
+                    "verdict": "faithful_paraphrase",
+                    "reasoning": "Captures the prediction",
+                }
+            ],
+            "missed_predictions": [
+                {"text_excerpt": "Z will fall", "why_valid": "Concrete event"}
+            ],
+        }
+    )
+    parsed = parse_judge_response(response)
+    assert len(parsed["per_claim"]) == 1
+    assert parsed["per_claim"][0]["verdict"] == "faithful_paraphrase"
+    assert len(parsed["missed_predictions"]) == 1
+
+
+def test_parse_judge_response_strips_markdown_fence():
+    """Like extractor parser, must tolerate ```json...``` wrappers."""
+    response = (
+        "```json\n"
+        + json.dumps({"per_claim": [], "missed_predictions": []})
+        + "\n```"
+    )
+    parsed = parse_judge_response(response)
+    assert parsed["per_claim"] == []
+    assert parsed["missed_predictions"] == []
+
+
+def test_parse_judge_response_invalid_json_returns_error_marker():
+    """Malformed JSON is reported as parse error, not raised."""
+    parsed = parse_judge_response("not json at all")
+    assert parsed["per_claim"] == []
+    assert parsed["missed_predictions"] == []
+    assert parsed.get("parse_error") is not None
+
+
+def test_parse_judge_response_unknown_verdict_falls_back_to_marker():
+    """Verdict outside the 6 allowed values is preserved but flagged."""
+    response = json.dumps(
+        {
+            "per_claim": [
+                {
+                    "claim_text": "X",
+                    "verdict": "totally_made_up",
+                    "reasoning": "...",
+                }
+            ],
+            "missed_predictions": [],
+        }
+    )
+    parsed = parse_judge_response(response)
+    assert parsed["per_claim"][0]["verdict"] == "totally_made_up"
+    assert parsed["per_claim"][0].get("verdict_invalid") is True
+
+
+def test_parse_judge_response_missing_top_level_keys_defaults_empty():
+    """If response only has per_claim, missed_predictions defaults to []."""
+    response = json.dumps(
+        {
+            "per_claim": [
+                {"claim_text": "X", "verdict": "exact_match", "reasoning": "..."}
+            ]
+        }
+    )
+    parsed = parse_judge_response(response)
+    assert parsed["missed_predictions"] == []
+    assert len(parsed["per_claim"]) == 1

@@ -113,3 +113,53 @@ def build_judge_prompt(
         published_date=published_date,
         claims_block=claims_block,
     )
+
+
+_CODE_FENCE_RE = re.compile(
+    r"^\s*```(?:json|JSON)?\s*\n?(.*?)\n?\s*```\s*$",
+    re.DOTALL,
+)
+
+
+def _strip_code_fence(text: str) -> str:
+    """Strip markdown code fences if present. Preserves content otherwise."""
+    match = _CODE_FENCE_RE.match(text.strip())
+    if match:
+        return match.group(1).strip()
+    return text.strip()
+
+
+def parse_judge_response(response: str) -> dict:
+    """Parse Opus judge output into normalized dict.
+
+    Returns dict with keys:
+        per_claim: list of {claim_text, verdict, reasoning, [verdict_invalid]}
+        missed_predictions: list of {text_excerpt, why_valid}
+        parse_error: str or None — populated when JSON is malformed
+
+    Unknown verdict values are preserved with `verdict_invalid: True` flag,
+    so the aggregator can count them separately. Malformed JSON returns
+    empty lists with parse_error populated.
+    """
+    try:
+        data = json.loads(_strip_code_fence(response))
+    except (json.JSONDecodeError, AttributeError, TypeError) as e:
+        return {
+            "per_claim": [],
+            "missed_predictions": [],
+            "parse_error": f"{type(e).__name__}: {e}",
+        }
+
+    per_claim = data.get("per_claim", []) or []
+    missed = data.get("missed_predictions", []) or []
+
+    # Flag unknown verdicts but preserve them for diagnosis
+    for item in per_claim:
+        if item.get("verdict") not in VERDICT_VALUES:
+            item["verdict_invalid"] = True
+
+    return {
+        "per_claim": per_claim,
+        "missed_predictions": missed,
+        "parse_error": None,
+    }
