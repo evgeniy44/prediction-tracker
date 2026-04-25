@@ -2544,68 +2544,90 @@ git push
 
 ---
 
-## Task 13: Detection Evaluation — precision/recall/F1
+## Task 13: Detection Evaluation — precision/recall/F1 ✅ COMPLETE (2026-04-20)
 
-**Files:**
-- Create: `prediction-tracker/scripts/evaluate_detection.py`
-- Create: `prediction-tracker/scripts/detection_results.json` (генерується)
+> **Retrospective update:** Originally planned as a single-model eval on 50 posts. Expanded during execution into a 5-model × 2-prompt comparison on 97 Arestovich gold posts. Key artifacts and commits below reflect what was actually built and shipped.
 
-**Ціль:** Прогнати detection (LLM extraction) на 50 розмічених постах і виміряти precision/recall/F1 проти gold labels.
+**Files (as built):**
+- Created: [`scripts/evaluate_detection.py`](../scripts/evaluate_detection.py) — 389 lines, multi-provider eval harness with `--model all-primary`, per-provider `CONCURRENCY_OVERRIDES` + `MIN_CALL_INTERVAL_SECONDS`, `DetectionLLM` wrapper that stubs `.embed()` so non-OpenAI providers can run without embedding endpoint
+- Created: [`tests/test_evaluate_detection.py`](../tests/test_evaluate_detection.py) — 303 lines, 17 TDD tests across 4 groups (compute_metrics, classify_post, DetectionLLM, run_evaluation_for_model)
+- Created: 10 result JSON files in `scripts/detection_results_*` — 5 v1 baseline (`*_v1_baseline.json`) + 5 v2 iterated
+- Modified: `pyproject.toml` — added `"scripts"` to `pythonpath`
+- Modified: `.env.example` — multi-provider key template
 
-- [ ] **Step 1: Створити evaluation скрипт**
+**Production code touched (separate commit `3635eb0 dev`):**
+- `src/prophet_checker/llm/prompts.py` — fence-stripping in `parse_*_response`, v2 `EXTRACTION_SYSTEM` with 6-category NO rules
+- `src/prophet_checker/llm/client.py` — `num_retries=3` for transient errors
+- `src/prophet_checker/config.py` — `model_config["extra"] = "ignore"` for new env keys
 
-`scripts/evaluate_detection.py`:
-1. Завантажити `gold_labels.json` і відповідні пости з `sample_posts.json`
-2. Для кожного поста: викликати PredictionExtractor
-3. Бінарний результат: `predictions_found > 0` → YES, інакше → NO
-4. Порівняти з gold label
-5. Порахувати: TP, FP, FN, TN, precision, recall, F1
-6. Зберегти повний звіт + список всіх FP і FN для аналізу
+**Goal achieved:** Empirically rank 5 LLMs on detection precision/recall/F1 over 97 gold-labeled Arestovich posts; pick winner for production extraction stage.
 
-Вихід — `scripts/detection_results.json`:
-```json
-{
-  "model": "claude-sonnet-4-6",
-  "total": 50,
-  "precision": 0.85,
-  "recall": 0.92,
-  "f1": 0.88,
-  "confusion": {"TP": 22, "FP": 4, "FN": 2, "TN": 22},
-  "false_positives": [{"id": "...", "text_preview": "...", "predictions": [...]}],
-  "false_negatives": [{"id": "...", "text_preview": "..."}]
-}
-```
+**Models evaluated (primary tier):**
+- `anthropic/claude-haiku-4-5`
+- `openai/gpt-5-mini`
+- `gemini/gemini-3.1-flash-lite-preview`
+- `deepseek/deepseek-chat`
+- `groq/llama-3.3-70b-versatile`
 
-- [ ] **Step 2: Запустити evaluation**
+**What actually happened (chronological):**
 
-```bash
-ANTHROPIC_API_KEY=sk-ant-... python scripts/evaluate_detection.py
-```
+- [x] **Step 1: Built `evaluate_detection.py` harness** (TDD-first, 17 tests)
+  - 4 test groups: pure metrics, classify_post bridge, DetectionLLM wrapper, end-to-end orchestration with DI
+  - `compute_metrics(gold, preds) -> dict` — P/R/F1 with zero-division guards (recall=None when no gold positives), raises ValueError on length mismatch
+  - `DetectionLLM` wrapper bypasses `embed()` with `[0.0]*1536` stub — required because Gemini/DeepSeek/Groq have no OpenAI-compatible embedding endpoint
+  - `_default_extractor_factory(model_id)` parses `provider/model`, looks up env-var API key, builds LLMClient + DetectionLLM + PredictionExtractor
 
-Вартість: ~50 постів × ~$0.005 = ~$0.25 (тільки 50 постів, не всі 1049).
+- [x] **Step 2: First Haiku run produced F1=0.0** — silent infrastructure bugs masked as "all NO" classifications. Fixed 4 bugs in succession before getting valid results:
+  1. **Markdown fence parsing:** Modern LLMs wrap JSON in ` ```json ... ``` ` fences. `parse_extraction_response` did `json.loads(raw)` → `JSONDecodeError` → `[]`. Extractor's broad `except: return []` swallowed silently. Fix: regex `_strip_code_fence()` + 3 new fence tests in `test_llm_prompts.py`. Preventive: added "Respond ONLY with raw JSON — do NOT wrap in markdown code fences" to `EXTRACTION_SYSTEM`.
+  2. **GPT-5 temperature constraint:** GPT-5 family rejects `temperature=0.0`. LiteLLM raises `UnsupportedParamsError` → swallowed by extractor → false NO. Fix: `litellm.drop_params = True` at module load in `evaluate_detection.py`. Trade-off: GPT-5 eval runs at temp=1.0 (stochastic).
+  3. **Gemini/Groq rate limits:** Free-tier preview models throttle at low RPM (Gemini ~5-10 RPM; Groq TPM-limited). 41 × 429s on Gemini, 160 × 429s on Groq even with `num_retries=3`. Fix: per-model `MIN_CALL_INTERVAL_SECONDS` (Gemini 7s, Groq 13s) + `CONCURRENCY_OVERRIDES` (1 each) — sequential pacing.
+  4. **Settings extra_forbidden:** Pydantic strict mode rejected new env keys (ANTHROPIC_API_KEY etc.) on `Settings()` instantiation. Fix: `model_config["extra"] = "ignore"` in `config.py`.
 
-- [ ] **Step 3: Error analysis**
+- [x] **Step 3: v1 baseline matrix on 5 models** (commit `3da94a3`)
 
-Переглянути FP і FN:
-- **FP (false positive):** LLM побачив prediction де його нема → уточнити промпт
-- **FN (false negative):** LLM пропустив prediction → розширити промпт або знизити поріг
+  | Model | P | R | F1 | Notes |
+  |---|---:|---:|---:|---|
+  | Llama 3.3 70B | 0.417 | 1.000 | **0.588** | Open-weight win on baseline |
+  | DeepSeek V3.1 | 0.366 | 1.000 | 0.536 | Open-weight #2 |
+  | GPT-5-mini | 0.254 | 1.000 | 0.405 | Greedy, high FP |
+  | Gemini 3.1 Flash Lite | 0.250 | 0.933 | 0.394 | Throttled |
+  | Haiku 4.5 | 0.256 | 0.667 | 0.370 | Only R<1 |
 
-- [ ] **Step 4: (Опціонально) Ітерація промптів**
+  Insight: precision clustered at 0.25-0.42 across models — strong signal that **prompt was the bottleneck, not model capability**.
 
-Якщо F1 < 0.80:
-1. Скоригувати `EXTRACTION_TEMPLATE` / `EXTRACTION_SYSTEM` в `prompts.py`
-2. Повторити evaluation
-3. Порівняти F1 до і після
+- [x] **Step 4: Prompt iteration — v2 `EXTRACTION_SYSTEM`**
+  Rewrote system prompt with explicit 3-criteria YES test + 6-category NO rejection rules (slogans, author event announcements, normative `треба/повинно`, vague forward statements, present-rhetoric, questions/calls/metaphors). Each category had inline UA/RU examples to anchor the rubric.
+  Archived v1 results: `mv detection_results_*.json -> *_v1_baseline.json`. Re-ran all 5 models with v2 prompt.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: v2 final matrix**
 
-```bash
-git add scripts/evaluate_detection.py
-git commit -m "feat: add detection evaluation script with precision/recall/F1"
-git push
-```
+  | Model | P | R | F1 | Δ F1 | Verdict |
+  |---|---:|---:|---:|---:|---|
+  | **Gemini 3.1 Flash Lite** | 0.778 | 0.933 | **0.848** | **+0.454** | 🏆 Production winner |
+  | DeepSeek V3.1 | 0.650 | 0.867 | 0.743 | +0.207 | Strong backup |
+  | GPT-5-mini | 0.500 | 1.000 | 0.667 | +0.262 | OK but stochastic + slow |
+  | Haiku 4.5 | 0.500 | 0.267 | 0.348 | −0.022 | Over-refused |
+  | Llama 3.3 70B | 1.000 | 0.067 | 0.125 | **−0.463** | 💥 Catastrophic over-refusal |
 
-**🏁 End of Task 13.** STOP. Показати precision/recall/F1 та error analysis. Отримати підтвердження перед Task 14.
+  Gemini crossed the F1 ≥ 0.80 acceptance threshold from the original plan. DeepSeek a strong vendor-diversity backup.
+  Cost: ~$0.20 total for all 10 eval runs (5 models × 2 prompts).
+  Insight: heuristics-heavy v2 prompt helps strong-reasoning models (Gemini/DeepSeek/GPT-5) but over-constrains smaller ones (Haiku, Llama 3.3 70B) — they default to NO.
+
+- [x] **Step 6: Error analysis**
+  25 posts had common FP across all 5 v1-baseline models — systematic LLM bias on Arestovich's slogan-heavy style. v2 rules targeted exactly these patterns; FP dropped from 21-44 (v1) to 4-26 (v2) on top-3 models.
+
+- [x] **Step 7: Commit + ship**
+  - `3635eb0 dev` — production code fixes (parser, client retries, config)
+  - `3da94a3 feat: detection evaluation harness + 5-model P/R/F1 results (Task 13)` — eval harness + 10 result JSONs + tests
+  - `4? feat: Sonnet/Opus eval session in flight` — Task 13.5 follow-up (extraction quality, separate plan)
+
+**Production decision:** Gemini 3.1 Flash Lite + v2 prompt for production extraction stage. Estimated cost on full 5572-post Arestovich corpus: ~$0.52 paid tier.
+
+**Outstanding open items:**
+- Detection F1 ≥ 0.80 only for 1/5 models. Whether prompt should be model-specific (lighter version for smaller models) — deferred. Solo project: Gemini wins, no need to make Llama/Haiku work.
+- Extraction quality (claim_text faithfulness, hallucination, coverage) — NOT measured in Task 13. Spawned **[Task 13.5: Extraction Quality Eval](2026-04-21-extraction-quality-eval-plan.md)** with LLM-as-judge approach.
+
+**🏁 Task 13 closed.** Continue to Task 13.5 (extraction quality) before Task 14 smoke test.
 
 ---
 
