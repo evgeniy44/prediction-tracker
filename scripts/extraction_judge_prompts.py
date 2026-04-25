@@ -58,11 +58,13 @@ For each extracted claim, assign exactly ONE of these six verdicts:
 - exact_match: The claim is a verbatim or near-verbatim quote from the post AND is itself a valid prediction (passes all four criteria above) AND its prediction_date / target_date / topic metadata is correct.
 - faithful_paraphrase: The claim is a semantically faithful rephrase of a valid prediction in the post AND metadata is correct. Minor rewording allowed.
 - valid_but_metadata_error: The claim correctly identifies a valid prediction in the post, but the prediction_date, target_date, or topic metadata is wrong or inconsistent with the text.
-- not_a_prediction: The claim text appears in the post but does NOT pass the three-criteria test (it's a slogan, announcement, normative, vague, present-tense rhetoric, etc. — categories A-F above).
+- not_a_prediction: The claim text appears in the post but does NOT pass the four-criteria test (it's a slogan, announcement, normative, vague, present-tense rhetoric, non-substantive, etc. — categories A-G above).
 - truncated: The claim is cut mid-sentence; the meaning is incomplete or distorted.
 - hallucination: The claim text is NOT present in the post and cannot be reasonably derived from it. The extractor fabricated content.
 
 Additionally, identify any predictions that ARE present in the post text but were NOT included in the extracted claims list. Report these as `missed_predictions`.
+
+CONSISTENCY ANCHOR (critical): apply the EXACT SAME four-criteria standard to both extracted claims and missed predictions. If a passage in the post would receive verdict `not_a_prediction` when extracted (because it's a slogan, normative, vague, non-substantive, etc.), then it MUST NOT appear in `missed_predictions`. The `missed_predictions` list contains ONLY passages that would receive `exact_match` or `faithful_paraphrase` if extracted — i.e. genuine valid predictions. Before adding any item to `missed_predictions`, ask: "If an extractor had produced this exact text, would I rate it `exact_match`/`faithful_paraphrase`?" If no — exclude it.
 
 Respond ONLY with raw JSON in this exact shape — do NOT wrap in markdown code fences:
 
