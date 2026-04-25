@@ -630,3 +630,42 @@ async def test_stage2_handles_judge_parse_failure(tmp_path):
     # parse_error preserved, per_claim empty so aggregate excludes from gold_agreement
     assert saved["judgements"]["model_a"]["p1"]["parse_error"] is not None
     assert saved["judgements"]["model_a"]["p1"]["per_claim"] == []
+
+
+# =============================================================================
+# Group B3 — Stage 3 orchestration (load + aggregate + save)
+# =============================================================================
+
+
+from extraction_quality_eval import run_stage3_aggregate
+
+
+def test_stage3_aggregate_writes_report_with_per_model_section(tmp_path):
+    judgements_artifact = {
+        "metadata": {"judge": "j/test"},
+        "judgements": {
+            "model_a": {
+                "p1": {
+                    "per_claim": [{"verdict": "exact_match"}],
+                    "missed_predictions": [],
+                }
+            }
+        },
+    }
+    judgements_path = tmp_path / "judgements.json"
+    judgements_path.write_text(json.dumps(judgements_artifact))
+
+    gold_path = tmp_path / "gold.json"
+    gold_path.write_text(json.dumps([{"id": "p1", "has_prediction": True}]))
+
+    output_path = tmp_path / "report.json"
+    run_stage3_aggregate(
+        judgements_path=judgements_path,
+        gold_labels_path=gold_path,
+        output_path=output_path,
+    )
+
+    report = json.loads(output_path.read_text())
+    assert "per_model" in report
+    assert report["per_model"]["model_a"]["total_claims"] == 1
+    assert report["per_model"]["model_a"]["avg_quality_score"] == pytest.approx(3.0)

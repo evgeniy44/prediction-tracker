@@ -325,3 +325,35 @@ async def run_stage2_judge(
         ),
         encoding="utf-8",
     )
+
+
+# =============================================================================
+# Stage 3 — aggregate report
+# =============================================================================
+
+
+def run_stage3_aggregate(
+    judgements_path: Path,
+    gold_labels_path: Path,
+    output_path: Path,
+) -> dict:
+    """Load judgements + gold, compute per-model report, save to disk.
+
+    Returns the report dict for in-process use (CLI prints summary table).
+    """
+    judgements_artifact = json.loads(judgements_path.read_text(encoding="utf-8"))
+    judgements = judgements_artifact["judgements"]
+    gold_labels = json.loads(gold_labels_path.read_text(encoding="utf-8"))
+
+    report = aggregate_metrics(judgements=judgements, gold_labels=gold_labels)
+    report["metadata"] = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source_judgements": str(judgements_path),
+        "source_gold": str(gold_labels_path),
+    }
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return report
