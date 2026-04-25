@@ -346,3 +346,117 @@ def test_aggregate_metrics_handles_parse_error():
     assert matrix["gold_YES_no_valid_extraction"] == 0
     assert matrix["gold_NO_with_extractions_labeled_valid"] == 0
     assert matrix["gold_NO_without_valid_extractions"] == 0
+
+
+# =============================================================================
+# Group B1 — Stage 1 orchestration (mocked extractor)
+# =============================================================================
+
+
+import asyncio
+from datetime import date
+
+from extraction_quality_eval import run_stage1_extraction
+
+
+def _fake_pred(claim: str, topic: str = "війна") -> MagicMock:
+    """Create a Prediction-like object with the fields Stage 1 reads."""
+    p = MagicMock()
+    p.claim_text = claim
+    p.prediction_date = date(2024, 1, 15)
+    p.target_date = date(2024, 6, 1)
+    p.topic = topic
+    return p
+
+
+def _make_factory(claim_map: dict[str, dict[str, list[str]]]):
+    """Build extractor_factory that returns mock extractors emitting fixed claims per post.
+
+    claim_map: {extractor_id: {post_id: [claim_text, ...]}}
+    """
+
+    def factory(model_id: str):
+        extractor = MagicMock()
+
+        async def fake_extract(*, document_id, **kwargs):
+            claims = claim_map.get(model_id, {}).get(document_id, [])
+            return [_fake_pred(c) for c in claims]
+
+        extractor.extract = AsyncMock(side_effect=fake_extract)
+        return extractor
+
+    return factory
+
+
+async def test_stage1_invokes_each_extractor_per_post(tmp_path):
+    posts = [
+        {"id": "p1", "person_name": "Арестович", "published_at": "2024-01-01", "text": "T1"},
+        {"id": "p2", "person_name": "Арестович", "published_at": "2024-01-02", "text": "T2"},
+    ]
+    claim_map = {
+        "model_a": {"p1": ["claim_a1"], "p2": ["claim_a2_1", "claim_a2_2"]},
+        "model_b": {"p1": ["claim_b1"], "p2": []},
+    }
+    out_path = tmp_path / "extractions.json"
+
+    await run_stage1_extraction(
+        extractors=["model_a", "model_b"],
+        posts=posts,
+        author_filter="Арестович",
+        output_path=out_path,
+        extractor_factory=_make_factory(claim_map),
+    )
+
+    saved = json.loads(out_path.read_text())
+    assert "extractions" in saved
+    assert set(saved["extractions"].keys()) == {"model_a", "model_b"}
+    assert len(saved["extractions"]["model_a"]["p1"]) == 1
+    assert saved["extractions"]["model_a"]["p1"][0]["claim_text"] == "claim_a1"
+    assert len(saved["extractions"]["model_a"]["p2"]) == 2
+    assert saved["extractions"]["model_b"]["p2"] == []
+
+
+async def test_stage1_filters_posts_by_author(tmp_path):
+    posts = [
+        {"id": "p1", "person_name": "Арестович", "published_at": "2024-01-01", "text": "T1"},
+        {"id": "p2", "person_name": "Гордон", "published_at": "2024-01-02", "text": "T2"},
+    ]
+    claim_map = {"model_a": {"p1": ["c1"], "p2": ["c2"]}}
+    out_path = tmp_path / "extractions.json"
+
+    await run_stage1_extraction(
+        extractors=["model_a"],
+        posts=posts,
+        author_filter="Арестович",
+        output_path=out_path,
+        extractor_factory=_make_factory(claim_map),
+    )
+
+    saved = json.loads(out_path.read_text())
+    # p2 (Гордон) excluded
+    assert set(saved["extractions"]["model_a"].keys()) == {"p1"}
+
+
+async def test_stage1_handles_extractor_exception_as_empty_list(tmp_path):
+    posts = [
+        {"id": "p1", "person_name": "Арестович", "published_at": "2024-01-01", "text": "T"}
+    ]
+    out_path = tmp_path / "extractions.json"
+
+    def factory(model_id):
+        m = MagicMock()
+        m.extract = AsyncMock(side_effect=RuntimeError("API down"))
+        return m
+
+    await run_stage1_extraction(
+        extractors=["model_a"],
+        posts=posts,
+        author_filter="Арестович",
+        output_path=out_path,
+        extractor_factory=factory,
+    )
+
+    saved = json.loads(out_path.read_text())
+    # Errors logged separately, post key still present with empty claims
+    assert saved["extractions"]["model_a"]["p1"] == []
+    assert "p1" in saved["errors"]["model_a"]

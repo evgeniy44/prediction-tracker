@@ -6,7 +6,16 @@ See spec: docs/2026-04-21-extraction-quality-eval-design.md
 """
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable
+
 from extraction_judge_prompts import VERDICT_ORDINAL, VERDICT_VALUES
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -116,3 +125,82 @@ def aggregate_metrics(
         }
 
     return {"per_model": per_model}
+
+
+# =============================================================================
+# Stage 1 — extraction orchestration
+# =============================================================================
+
+
+def _serialize_prediction(p) -> dict:
+    """Convert a Prediction domain object to JSON-friendly dict."""
+    return {
+        "claim_text": p.claim_text,
+        "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
+        "target_date": p.target_date.isoformat() if p.target_date else None,
+        "topic": p.topic,
+    }
+
+
+async def run_stage1_extraction(
+    extractors: list[str],
+    posts: list[dict],
+    author_filter: str,
+    output_path: Path,
+    extractor_factory: Callable,
+    concurrency: int = 5,
+) -> None:
+    """Run each extractor over filtered posts, save full extractions to disk.
+
+    Errors during extraction are logged into a separate `errors` map per model;
+    the post still appears in `extractions` with an empty claims list.
+    """
+    filtered_posts = [p for p in posts if p["person_name"] == author_filter]
+    extractions: dict[str, dict[str, list[dict]]] = {m: {} for m in extractors}
+    errors: dict[str, dict[str, str]] = {m: {} for m in extractors}
+
+    for model_id in extractors:
+        extractor = extractor_factory(model_id)
+        sem = asyncio.Semaphore(concurrency)
+
+        async def process(post: dict) -> tuple[str, list[dict], str | None]:
+            async with sem:
+                try:
+                    preds = await extractor.extract(
+                        text=post["text"],
+                        person_id=post["person_name"],
+                        document_id=post["id"],
+                        person_name=post["person_name"],
+                        published_date=post["published_at"],
+                    )
+                    return post["id"], [_serialize_prediction(p) for p in preds], None
+                except Exception as e:
+                    logger.exception(
+                        "Extraction failed for %s on %s", model_id, post["id"]
+                    )
+                    return post["id"], [], f"{type(e).__name__}: {e}"
+
+        results = await asyncio.gather(*(process(p) for p in filtered_posts))
+        for post_id, claims, err in results:
+            extractions[model_id][post_id] = claims
+            if err:
+                errors[model_id][post_id] = err
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "dataset_size": len(filtered_posts),
+                    "extractors": list(extractors),
+                    "author_filter": author_filter,
+                },
+                "extractions": extractions,
+                "errors": errors,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
