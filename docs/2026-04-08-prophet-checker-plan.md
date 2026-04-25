@@ -20,23 +20,64 @@
 
 ---
 
-## Milestones
+## Project Status (updated 2026-04-21)
 
-The plan is split into 5 milestones. Each milestone produces a working, committable state. Take breaks between milestones.
+> This master plan is a **living document** — each task header shows current status. Completed tasks include retrospective notes (what was actually built, key deviations from original plan, commit refs). Detailed implementation specs for in-flight tasks live in separate files (e.g. Task 13.5).
 
-| Milestone | Tasks | What you get |
-|-----------|-------|-------------|
-| **M1: Foundation** | 0-4 | GitHub repo, project scaffold, domain models, storage interfaces |
-| **M2: AI Pipeline** | 5-9 | LLM client, prompts, extraction, verification |
-| **M2.5: Eval & Data** | 10, 12-14 | Telegram data, gold labels, detection eval (P/R/F1), smoke test. *Task 11 (YouTube transcripts) removed 2026-04-20 — MVP scope trimmed to Telegram-only.* |
-| **M3: Orchestration** | 15-16 | Ingestion pipeline, FastAPI app |
-| **M4: Database & Infra** | 17-19 | Docker, Alembic migrations, integration test |
-| **M5: CI & Sources** | 20-22 | GitHub Actions CI, Telegram collector, news collector |
-| **M6: AWS Deploy** | 23-24 | RDS PostgreSQL + pgvector, EC2 deploy |
+### Status legend
+
+| Symbol | Meaning |
+|---|---|
+| ✅ COMPLETE | Done, committed, validated |
+| 🔄 IN PROGRESS | Currently being worked on |
+| 📋 PLANNED | In scope, not started |
+| ⏸ DEFERRED | Removed from active queue, may revisit |
+| ❌ REMOVED | Cut from project scope |
+
+### Milestones
+
+| Milestone | Tasks | Status | Notes |
+|---|---|---|---|
+| **M1: Foundation** | 0-4 | ✅ COMPLETE | All 5 tasks shipped. Scaffold, domain models, storage interfaces, ORM + Alembic. |
+| **M2: AI Pipeline** | 5-9 | ✅ COMPLETE | LLM client, prompts, PredictionExtractor, PredictionVerifier. 38 unit tests. |
+| **M2.5: Eval & Data** | 10, 12-14 | 🔄 IN PROGRESS | Task 10 ✅, Task 12 ✅ (130 gold labels), Task 13 ✅ (Gemini wins F1=0.848), Task 13.5 📋 (extraction quality plan ready), Task 14 ⏸ deferred. *Task 11 ❌ removed 2026-04-20 — MVP trimmed to Telegram-only.* |
+| **M3: Orchestration** | 15-16 | 📋 PLANNED | Ingestion pipeline orchestrator + FastAPI app entry point. |
+| **M4: Database & Infra** | 17-19 | 📋 PLANNED | Docker Compose, Alembic migration, integration smoke. |
+| **M5: CI & Sources** | 20-22 | 📋 PLANNED | GitHub Actions CI, Telegram Source adapter, news collector. |
+| **M6: AWS Deploy** | 23-24 | 📋 PLANNED | RDS PostgreSQL + pgvector, EC2 deploy. |
+
+### Active follow-up specs
+
+- **Task 13.5 — Extraction Quality Eval** (📋 plan ready, not executed)
+  - Spec: [`2026-04-21-extraction-quality-eval-design.md`](2026-04-21-extraction-quality-eval-design.md) (commit `403f2fb`)
+  - Plan: [`2026-04-21-extraction-quality-eval-plan.md`](2026-04-21-extraction-quality-eval-plan.md) (commit `ee0b052`)
+
+### Recent commits
+
+```
+7204b91 docs: retrospective rewrite of Task 13 in master plan
+ee0b052 docs: implementation plan for extraction quality eval (Task 13.5)
+403f2fb docs: design spec for extraction quality eval (Task 13.5)
+774c340 docs: remove Task 11 (YouTube transcripts)
+3da94a3 feat: detection evaluation harness + 5-model P/R/F1 results (Task 13)
+3635eb0 [intermediate] production code fixes for Task 13 (parser, retries, config)
+a992e0f feat: extend gold labels to 130 posts + refine edge case guidelines (Task 12)
+428aea4 feat: add annotation guidelines and gold labels for 50 posts (Task 12 initial)
+d7c9e5e feat: add Telegram post collection script (Task 10)
+20746b8 feat: implement PredictionVerifier (Task 9)
+610b0dd feat: implement PredictionExtractor (Task 8)
+006a458 feat: add prompt templates for extraction, verification, and RAG (Task 7)
+f90eb07 feat: add LLM client with LiteLLM abstraction (Task 6)
+cd25af0 feat: add PostgreSQL storage implementation (Task 5)
+1ca8a16 feat: add SQLAlchemy ORM models and Alembic config (Task 4)
+035468e feat: add storage Protocol interfaces (Task 3)
+04e195c feat: add Pydantic domain models (Task 2)
+2f736de feat: project scaffold with config, dependencies, and tests (Task 1)
+```
 
 ---
 
-## Task 0: GitHub Repository Setup
+## Task 0: GitHub Repository Setup ✅ COMPLETE (commits 83fc1dc, 693995a — initial repo + planning)
 
 **Files:**
 - Create: GitHub repo `prediction-tracker`
@@ -210,7 +251,7 @@ prediction-tracker/
 
 ---
 
-## Task 1: Project Scaffold
+## Task 1: Project Scaffold ✅ COMPLETE (commit 2f736de)
 
 **Files:**
 - Create: `prediction-tracker/pyproject.toml`
@@ -381,7 +422,7 @@ git push
 
 ---
 
-## Task 2: Domain Models
+## Task 2: Domain Models ✅ COMPLETE (commit 04e195c)
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/models/__init__.py`
@@ -587,7 +628,7 @@ git push
 
 ---
 
-## Task 3: Storage Interfaces
+## Task 3: Storage Interfaces ✅ COMPLETE (commit 035468e)
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/storage/__init__.py`
@@ -857,7 +898,7 @@ git push
 
 ---
 
-## Task 4: SQLAlchemy ORM Models + Alembic
+## Task 4: SQLAlchemy ORM Models + Alembic ✅ COMPLETE (commit 1ca8a16)
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/models/db.py`
@@ -1070,7 +1111,7 @@ git push
 
 ---
 
-## Task 5: PostgreSQL Storage Implementation
+## Task 5: PostgreSQL Storage Implementation ✅ COMPLETE (commit cd25af0)
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/storage/postgres.py`
@@ -1402,7 +1443,7 @@ git push
 
 ---
 
-## Task 6: LLM Client
+## Task 6: LLM Client ✅ COMPLETE (commit f90eb07)
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/llm/__init__.py`
@@ -1535,7 +1576,9 @@ git push
 
 ---
 
-## Task 7: Prompt Templates
+## Task 7: Prompt Templates ✅ COMPLETE (commit 006a458)
+
+> **Retrospective:** Note: `EXTRACTION_SYSTEM` was later iterated to v2 in Task 13 to add 6-category NO rules; current production prompt reflects that change.
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/llm/prompts.py`
@@ -1788,7 +1831,9 @@ git push
 
 ---
 
-## Task 8: Prediction Extractor
+## Task 8: Prediction Extractor ✅ COMPLETE (commit 610b0dd)
+
+> **Retrospective:** Note: extractor's broad `try/except: return []` later proved problematic — masked 4 infra failures during Task 13 eval. Future refactor (split CompletionClient/EmbeddingService) was discussed but deferred — see Task 13.5 spec architecture section.
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/analysis/__init__.py`
@@ -1979,7 +2024,7 @@ git push
 
 ---
 
-## Task 9: Prediction Verifier
+## Task 9: Prediction Verifier ✅ COMPLETE (commit 20746b8)
 
 
 
@@ -2357,7 +2402,9 @@ git push
 
 ---
 
-## Task 10: Збір реальних постів з Telegram
+## Task 10: Збір реальних постів з Telegram ✅ COMPLETE (commit d7c9e5e — 1049 Arestovich posts collected via Telethon)
+
+> **Retrospective:** Note: full corpus `scripts/arestovich/all.json` (5572 posts) collected separately, gitignored. Used for future Task 14 smoke test if revived.
 
 **Files:**
 - Create: `prediction-tracker/scripts/collect_telegram_posts.py`
@@ -2478,7 +2525,9 @@ git push
 
 ---
 
-## Task 12: Gold Labels — ручна розмітка 50 постів
+## Task 12: Gold Labels — ручна розмітка 50 постів ✅ COMPLETE (commits 428aea4 → a992e0f)
+
+> **Retrospective:** Originally planned 50 binary labels. Extended to **130 labels** (16 YES / 114 NO) on 2026-04-18 to support Task 13 detection eval — original 3/47 YES/NO split was too skewed for meaningful P/R/F1. Arestovich subset: 97 labels (15 YES / 82 NO, 15.5% — matches predicted base rate). [`docs/annotation-guidelines.md`](annotation-guidelines.md) refined with 4 hard-pattern edge cases (timestamp lists, slogans, normative, vague) discovered during annotation.
 
 **Files:**
 - Create: `prediction-tracker/docs/annotation-guidelines.md`
@@ -2631,7 +2680,50 @@ git push
 
 ---
 
-## Task 14: Smoke Test — extraction на повному датасеті
+## Task 13.5: Extraction Quality Evaluation 📋 PLANNED
+
+> **Why this exists:** Task 13 measured **detection** quality (binary YES/NO match against gold labels). It did NOT verify whether `claim_text`, dates, or topics extracted by the model were faithful to the source post. Task 13.5 closes that gap with an LLM-as-judge evaluation.
+
+**Approach:** 3-stage pipeline — Stage 1 captures full extraction outputs from 3 models (Gemini 3.1 Flash Lite, DeepSeek V3.1, Sonnet 4.6); Stage 2 invokes Claude Opus 4.6 as judge to assign 6-value categorical verdicts (`exact_match` / `faithful_paraphrase` / `valid_but_metadata_error` / `not_a_prediction` / `truncated` / `hallucination`) to each extracted claim; Stage 3 aggregates per-model metrics including hallucination rate, missed predictions, and gold-label agreement matrix.
+
+**Files (specs):**
+- Spec: [`2026-04-21-extraction-quality-eval-design.md`](2026-04-21-extraction-quality-eval-design.md) (commit `403f2fb`)
+- Implementation plan: [`2026-04-21-extraction-quality-eval-plan.md`](2026-04-21-extraction-quality-eval-plan.md) (commit `ee0b052`) — 10 detailed tasks, ~27 TDD tests, no production code changes
+
+**Files (will be created during execution):**
+- `scripts/extraction_judge_prompts.py` — judge SYSTEM/USER templates, 6-value verdict enum, parse helpers
+- `scripts/extraction_quality_eval.py` — 3 stage runners + aggregate_metrics + CLI
+- `tests/test_extraction_quality_eval.py` — ~27 tests across 3 groups
+- `scripts/extraction_outputs.json` (Stage 1 artifact)
+- `scripts/extraction_judgements.json` (Stage 2 artifact)
+- `scripts/extraction_eval_report.json` (Stage 3 artifact)
+
+**Reuse from Task 13** (no production code changes):
+- `DetectionLLM` wrapper — skip embeddings (same infra reasons)
+- `_default_extractor_factory` — provider/key wiring
+- `CONCURRENCY_OVERRIDES` + `MIN_CALL_INTERVAL_SECONDS` — rate-limit safety
+- `EXTRACTION_SYSTEM` v2 — current production prompt
+- Annotation guidelines — embedded in judge SYSTEM prompt for consistent rubric
+
+**Budget:** ~$14.38 (extraction $1.28 + Opus judge $13.10). Wall ~2-3 hours.
+
+**Acceptance criteria:**
+- All ~27 tests pass
+- 3 JSON artifacts generated
+- `avg_quality_score` per model computed (ordinal mapping 0-3)
+- `hallucination_rate` distinguishes models
+- `gold_agreement` matrix populated (cross-tab judge verdicts vs our gold labels)
+- No regression in existing 63 tests
+
+**Implementation steps:** see [implementation plan](2026-04-21-extraction-quality-eval-plan.md). Decomposed into 4 milestones (M1 pure functions / M2 stage runners / M3 CLI+integration / M4 real run).
+
+**🏁 End of Task 13.5.** STOP. Report final metrics + production decision (which model wins extraction quality, ranked alongside Task 13 detection F1). Brainstorm next steps with user (LinkedIn post / Task 14 revival / proceed to M3 Orchestration).
+
+---
+
+## Task 14: Smoke Test — extraction на повному датасеті ⏸ DEFERRED (2026-04-21 — user decision)
+
+> **Retrospective:** Smoke test on full 5572-post Arestovich corpus deferred. Rationale: Task 13's 97×5×2 eval already provided ~970 extraction calls of empirical signal — additional infrastructure-scaling validation is ceremonial for solo pet project. May revive when ingestion pipeline (Task 15) is built and we have natural reason to process the full corpus.
 
 **Files:**
 - Create: `prediction-tracker/scripts/smoke_test.py`
@@ -2660,7 +2752,7 @@ git push
 
 ---
 
-## Task 15: Ingestion Pipeline Orchestrator
+## Task 15: Ingestion Pipeline Orchestrator 📋 PLANNED
 
 
 **Files:**
@@ -2902,7 +2994,7 @@ git push
 
 ---
 
-## Task 16: FastAPI Application Entry Point
+## Task 16: FastAPI Application Entry Point 📋 PLANNED
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/main.py`
@@ -2959,7 +3051,7 @@ git push
 
 ---
 
-## Task 17: Docker + Docker Compose
+## Task 17: Docker + Docker Compose 📋 PLANNED
 
 **Files:**
 - Create: `prediction-tracker/Dockerfile`
@@ -3050,7 +3142,7 @@ git push
 
 ---
 
-## Task 18: Run Alembic Migration
+## Task 18: Run Alembic Migration 📋 PLANNED
 
 **Files:**
 - Modify: `prediction-tracker/alembic.ini` (URL from env)
@@ -3097,7 +3189,7 @@ git push
 
 ---
 
-## Task 19: Integration Smoke Test
+## Task 19: Integration Smoke Test 📋 PLANNED
 
 **Files:**
 - Create: `prediction-tracker/tests/test_integration.py`
@@ -3213,7 +3305,7 @@ git push
 
 ---
 
-## Task 20: GitHub Actions CI
+## Task 20: GitHub Actions CI 📋 PLANNED
 
 **Files:**
 - Create: `prediction-tracker/.github/workflows/ci.yml`
@@ -3301,7 +3393,7 @@ git push
 
 ---
 
-## Task 21: Source Interface + Telegram Collector
+## Task 21: Source Interface + Telegram Collector 📋 PLANNED
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/sources/__init__.py`
@@ -3377,7 +3469,7 @@ async def test_telegram_collector_skips_empty_messages():
 
 ---
 
-## Task 22: News Collector
+## Task 22: News Collector 📋 PLANNED
 
 **Files:**
 - Create: `prediction-tracker/src/prophet_checker/sources/news_collector.py`
@@ -3393,7 +3485,7 @@ async def test_telegram_collector_skips_empty_messages():
 
 ---
 
-## Task 23: AWS RDS PostgreSQL + pgvector
+## Task 23: AWS RDS PostgreSQL + pgvector 📋 PLANNED
 
 **Files:**
 - Create: `prediction-tracker/infra/setup-rds.sh`
@@ -3490,7 +3582,7 @@ git push
 
 ---
 
-## Task 24: AWS EC2 + Deploy
+## Task 24: AWS EC2 + Deploy 📋 PLANNED
 
 **Files:**
 - Create: `prediction-tracker/infra/setup-ec2.sh`
