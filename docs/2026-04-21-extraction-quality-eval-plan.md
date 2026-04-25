@@ -478,6 +478,8 @@ git commit -m "feat: parse_judge_response with fence-strip + unknown-verdict fla
 - Create: `prediction-tracker/scripts/extraction_quality_eval.py` (with aggregate_metrics)
 - Test: `prediction-tracker/tests/test_extraction_quality_eval.py` (add Group A3)
 
+> **Plan revision (2026-04-21):** original plan did not handle `parse_error` from `parse_judge_response` — would have silently treated judge parse-failures as "model produced no valid extractions", contaminating `gold_agreement` matrix. Added: (1) `parse_error_count` tracking field, (2) **exclude** parse-error posts from `gold_agreement` (treat as missing data), (3) one new test asserting both behaviors.
+
 - [ ] **Step 1: Add failing tests**
 
 Append to `tests/test_extraction_quality_eval.py`:
@@ -620,6 +622,50 @@ def test_aggregate_metrics_handles_invalid_verdict():
     assert m["invalid_verdict_count"] == 1
     # avg only over valid verdicts: 3.0 / 1 = 3.0
     assert m["avg_quality_score"] == pytest.approx(3.0, abs=1e-6)
+
+
+def test_aggregate_metrics_handles_parse_error():
+    """Posts with parse_error must be counted but excluded from gold_agreement.
+
+    A judge parse-failure is an INFRA issue, not a model failure. We should
+    track count for visibility but NOT penalize the model in gold_agreement
+    matrix (treat as missing data).
+    """
+    judgements = {
+        "model_x": {
+            # Successful judgement — gold_YES, valid extraction → counted
+            "yes_ok": {
+                "per_claim": [{"verdict": "exact_match"}],
+                "missed_predictions": [],
+                "parse_error": None,
+            },
+            # Judge parse failed on gold_YES post — should NOT be counted
+            # as gold_YES_no_valid_extraction (since we don't actually know).
+            "yes_parse_failed": {
+                "per_claim": [],
+                "missed_predictions": [],
+                "parse_error": "JSONDecodeError: line 1 column 5",
+            },
+            # Judge parse failed on gold_NO post — also excluded.
+            "no_parse_failed": {
+                "per_claim": [],
+                "missed_predictions": [],
+                "parse_error": "TypeError: unexpected token",
+            },
+        }
+    }
+    report = aggregate_metrics(
+        judgements=judgements,
+        gold_labels=_gold(["yes_ok", "yes_parse_failed"], ["no_parse_failed"]),
+    )
+    m = report["per_model"]["model_x"]
+    assert m["parse_error_count"] == 2
+    matrix = m["gold_agreement"]
+    # Only "yes_ok" contributes — parse-error posts excluded
+    assert matrix["gold_YES_with_valid_extraction"] == 1
+    assert matrix["gold_YES_no_valid_extraction"] == 0
+    assert matrix["gold_NO_with_extractions_labeled_valid"] == 0
+    assert matrix["gold_NO_without_valid_extractions"] == 0
 ```
 
 - [ ] **Step 2: Run new tests — verify they fail**
@@ -675,6 +721,7 @@ def aggregate_metrics(
     for extractor_id, posts in judgements.items():
         verdict_counts = _empty_distribution()
         invalid_count = 0
+        parse_error_count = 0
         ordinal_sum = 0
         ordinal_n = 0
         missed_total = 0
@@ -684,6 +731,12 @@ def aggregate_metrics(
         gold_no_no_valid = 0
 
         for post_id, j in posts.items():
+            # Skip parse-error posts entirely (infra failure, not model failure).
+            # Counted for visibility but excluded from gold_agreement matrix.
+            if j.get("parse_error") is not None:
+                parse_error_count += 1
+                continue
+
             claims = j.get("per_claim", [])
             missed = j.get("missed_predictions", [])
             missed_total += len(missed)
@@ -725,6 +778,7 @@ def aggregate_metrics(
         per_model[extractor_id] = {
             "total_claims": total_claims,
             "invalid_verdict_count": invalid_count,
+            "parse_error_count": parse_error_count,
             "verdict_distribution": verdict_counts,
             "avg_quality_score": round(avg_score, 3),
             "hallucination_rate": round(hallucination_rate, 3),
@@ -747,13 +801,13 @@ def aggregate_metrics(
 .venv/bin/pytest tests/test_extraction_quality_eval.py -v
 ```
 
-Expected: 15 tests PASS (10 from Tasks 1-2 + 5 new aggregate tests).
+Expected: 16 tests PASS (10 from Tasks 1-2 + 6 new aggregate tests including parse_error handling).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add scripts/extraction_quality_eval.py tests/test_extraction_quality_eval.py
-git commit -m "feat: aggregate_metrics with verdict distribution + gold agreement matrix (Task 13.5 step 3)"
+git commit -m "feat: aggregate_metrics with verdict distribution + gold agreement matrix + parse_error handling (Task 13.5 step 3)"
 ```
 
 **🏁 End of Task 3.** STOP. Report. Wait for "ok"/"next".
@@ -999,6 +1053,8 @@ git commit -m "feat: run_stage1_extraction — concurrent extractor orchestratio
 - Modify: `prediction-tracker/scripts/extraction_quality_eval.py` (add Stage 2)
 - Test: `prediction-tracker/tests/test_extraction_quality_eval.py` (add Group B2)
 
+> **Plan revision (2026-04-21):** added CLI logging for parse_error count after Stage 2 completes (visibility into infra issues during eval). The artifact already preserves `parse_error` field per Task 2 design — this revision just surfaces the count.
+
 - [ ] **Step 1: Add failing tests**
 
 Append to `tests/test_extraction_quality_eval.py`:
@@ -1215,6 +1271,20 @@ async def run_stage2_judge(
     results = await asyncio.gather(*tasks)
     for model_id, post_id, parsed in results:
         judgements[model_id][post_id] = parsed
+
+    # Surface parse_error count to console for visibility (infra signal,
+    # not model-quality signal). Aggregator excludes these from gold_agreement.
+    parse_error_summary: dict[str, int] = {}
+    for model_id, posts_dict in judgements.items():
+        n_errors = sum(1 for p in posts_dict.values() if p.get("parse_error"))
+        if n_errors > 0:
+            parse_error_summary[model_id] = n_errors
+    if parse_error_summary:
+        logger.warning(
+            "Judge parse failures: %s. Excluded from gold_agreement matrix.",
+            parse_error_summary,
+        )
+        print(f"  [stage2] judge parse failures: {parse_error_summary}")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
