@@ -29,10 +29,11 @@ VERDICT_ORDINAL: dict[str, int] = {
 
 JUDGE_SYSTEM = """You are evaluating the quality of prediction extraction from Ukrainian/Russian political commentary posts.
 
-A valid prediction must satisfy ALL three criteria:
+A valid prediction must satisfy ALL FOUR criteria:
 1. Refers to a FUTURE event or state (not present assessment, not past event)
 2. Has a VERIFIABLE OUTCOME — a concrete condition that can be objectively checked as true or false later
 3. Concerns EXTERNAL events (politics, war, economy, people, institutions) — NOT the author's own scheduled activities
+4. Is SUBSTANTIVE — outcome must be genuinely uncertain or strategically/politically meaningful (NOT a known fact restated, NOT a mechanical logistical certainty, NOT a procedural inevitability)
 
 Do NOT accept these as predictions (they superficially look like predictions but fail criteria above):
 
@@ -42,12 +43,19 @@ C. Normative statements describing what SHOULD happen (e.g. "Потрібно п
 D. Vague forward statements without concrete criteria (e.g. "Найближчі тижні будуть переломними", "Ситуація скоро зміниться").
 E. Analysis of present state or past events phrased with future-tense verbs for rhetorical effect (e.g. "Ця війна вже змінила світ").
 F. Questions, calls to action, metaphors, sarcasm — these are not claims.
+G. Non-substantive claims (fail criterion 4): mechanical logistics or restated known facts. Examples:
+   - "К 14 января самолеты вернут дипломатов" — routine logistical schedule
+   - "Трамп зможе вести переговори тільки після інавгурації 20 січня" — known constitutional fact, not a forecast
+   - "Суд має винести рішення до кінця місяця" — procedural deadline
+   These claims may be technically "future + verifiable + external" but their OUTCOME is mechanically determined and not strategically meaningful. Verdict: not_a_prediction.
 
-Verification test: ask "Could an impartial fact-checker in 1 year objectively confirm or refute this specific statement?" If the answer requires interpretation of vague terms — it's NOT a prediction.
+Verification tests:
+- Criterion 2: "Could an impartial fact-checker in 1 year objectively confirm or refute this?"
+- Criterion 4: "Would a reader 1 year later actually CARE whether this came true?" If no — it's not substantive, verdict not_a_prediction.
 
 For each extracted claim, assign exactly ONE of these six verdicts:
 
-- exact_match: The claim is a verbatim or near-verbatim quote from the post AND is itself a valid prediction (passes all three criteria above) AND its prediction_date / target_date / topic metadata is correct.
+- exact_match: The claim is a verbatim or near-verbatim quote from the post AND is itself a valid prediction (passes all four criteria above) AND its prediction_date / target_date / topic metadata is correct.
 - faithful_paraphrase: The claim is a semantically faithful rephrase of a valid prediction in the post AND metadata is correct. Minor rewording allowed.
 - valid_but_metadata_error: The claim correctly identifies a valid prediction in the post, but the prediction_date, target_date, or topic metadata is wrong or inconsistent with the text.
 - not_a_prediction: The claim text appears in the post but does NOT pass the three-criteria test (it's a slogan, announcement, normative, vague, present-tense rhetoric, etc. — categories A-F above).

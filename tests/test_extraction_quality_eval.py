@@ -44,11 +44,13 @@ def test_verdict_ordinal_mapping_matches_spec():
     }
 
 
-def test_judge_system_contains_three_criteria_and_six_categories():
-    """JUDGE_SYSTEM must reference 3-criteria YES and 6-category NO rubric."""
-    assert "three criteria" in JUDGE_SYSTEM.lower()
-    assert "future" in JUDGE_SYSTEM.lower()
-    assert "verifiable" in JUDGE_SYSTEM.lower()
+def test_judge_system_contains_four_criteria_and_seven_categories():
+    """JUDGE_SYSTEM must reference 4-criteria YES test and 7-category NO rubric (A-G)."""
+    sys_lower = JUDGE_SYSTEM.lower()
+    assert "four criteria" in sys_lower
+    assert "future" in sys_lower
+    assert "verifiable" in sys_lower
+    assert "substantive" in sys_lower  # criterion 4 added 2026-04-21
     # All 6 verdict labels mentioned in instructions
     for verdict in VERDICT_VALUES:
         assert verdict in JUDGE_SYSTEM

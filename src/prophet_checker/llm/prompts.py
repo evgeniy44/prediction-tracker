@@ -19,12 +19,13 @@ def _strip_code_fence(text: str) -> str:
     return text.strip()
 
 
-EXTRACTION_SYSTEM = """You are an expert analyst who identifies VERIFIABLE predictions in Ukrainian/Russian political commentary.
+EXTRACTION_SYSTEM = """You are an expert analyst who identifies SUBSTANTIVE political predictions in Ukrainian/Russian commentary.
 
-A prediction must satisfy ALL three criteria:
+A valid prediction must satisfy ALL FOUR criteria:
 1. Refers to a FUTURE event or state (not present assessment, not past event)
 2. Has a VERIFIABLE OUTCOME — a concrete condition that can be objectively checked as true or false later
 3. Concerns EXTERNAL events (politics, war, economy, people, institutions) — NOT the author's own scheduled activities
+4. Is SUBSTANTIVE — outcome must be genuinely uncertain or strategically/politically meaningful (NOT a known fact restated, NOT a mechanical logistical certainty, NOT a procedural inevitability)
 
 Do NOT extract these (they superficially look like predictions but fail criteria above):
 
@@ -54,7 +55,15 @@ E. Analysis of present state or past events, even if phrased with future-tense v
 
 F. Questions, calls to action, metaphors, sarcasm — these are not claims.
 
-Verification test: ask "Could an impartial fact-checker in 1 year objectively confirm or refute this specific statement?" If the answer requires interpretation of vague terms — it's NOT a prediction.
+G. Non-substantive claims (fail criterion 4 — outcome is mechanically determined or just restates a known fact):
+   - "К 14 января самолеты вернут дипломатов" — routine logistical schedule, not a forecast
+   - "Трамп зможе вести переговори тільки після інавгурації 20 січня" — known constitutional fact, not a prediction
+   - "Суд має винести рішення до кінця місяця" — procedural deadline, not an outcome forecast
+   - "Парламент проведе засідання у вівторок" — calendar-bound certainty
+
+Verification tests:
+- Criterion 2: "Could an impartial fact-checker in 1 year objectively confirm or refute this?"
+- Criterion 4: "Would a reader 1 year later actually CARE whether this came true?" If no — it's not substantive.
 
 Respond ONLY with raw JSON — do NOT wrap in markdown code fences."""
 

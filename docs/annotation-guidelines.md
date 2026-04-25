@@ -83,6 +83,19 @@ Timeline without content, or content without any threshold → **NO**.
 
 If you can't imagine what specifically would falsify the claim in 1/5/10 years, it's not a prediction.
 
+### 5. Non-substantive claims (added 2026-04-21 — discovered during Task 13.5 dry run)
+
+Verifiable + future-pointing — but outcome is **mechanically determined** or just **restates a known fact**. These pollute the dataset (no user would query them) → **NO**.
+
+- "К 14 січня літаки повернуть дипломатів" — routine logistical schedule, not a forecast.
+- "Трамп зможе вести переговори тільки після інавгурації 20 січня" — restates US constitutional law.
+- "Суд має винести рішення до кінця місяця" — procedural deadline, not outcome forecast.
+- "Парламент проведе засідання у вівторок" — calendar-bound certainty.
+
+**Test:** "Would a reader 1 year later actually CARE whether this came true?" If no — it's not substantive, label NO.
+
+This rules out prediction-shaped claims about scheduled events whose **mechanism is known** (planes fly on schedule, leaders inaugurate on date, parliaments meet weekly). Real predictions are about events where the **outcome is uncertain** — would a peace deal be signed, would a leader be removed, would sanctions take effect.
+
 ## Important
 
 - If a post contains **both** predictions and non-predictions, label **YES** (at least one prediction present)
