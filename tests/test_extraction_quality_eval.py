@@ -460,3 +460,173 @@ async def test_stage1_handles_extractor_exception_as_empty_list(tmp_path):
     # Errors logged separately, post key still present with empty claims
     assert saved["extractions"]["model_a"]["p1"] == []
     assert "p1" in saved["errors"]["model_a"]
+
+
+# =============================================================================
+# Group B2 — Stage 2 orchestration (mocked judge LLM)
+# =============================================================================
+
+
+from extraction_quality_eval import run_stage2_judge
+
+
+def _make_judge_factory(response_map: dict[str, str]):
+    """Factory that returns judge LLM whose .complete() returns canned response.
+
+    response_map: {keyword_in_prompt: judge_response_text}
+    """
+
+    def factory(judge_id: str):
+        client = MagicMock()
+
+        async def fake_complete(prompt: str, system: str | None = None):
+            # naive lookup: find first response_map key present in prompt
+            for key, resp in response_map.items():
+                if key in prompt:
+                    return resp
+            return json.dumps({"per_claim": [], "missed_predictions": []})
+
+        client.complete = AsyncMock(side_effect=fake_complete)
+        return client
+
+    return factory
+
+
+async def test_stage2_invokes_judge_per_extractor_post(tmp_path):
+    extractions_artifact = {
+        "metadata": {"extractors": ["model_a", "model_b"]},
+        "extractions": {
+            "model_a": {
+                "p1": [
+                    {
+                        "claim_text": "claim_a1",
+                        "prediction_date": "2024-01-01",
+                        "target_date": None,
+                        "topic": "війна",
+                    }
+                ],
+            },
+            "model_b": {"p1": []},
+        },
+        "errors": {"model_a": {}, "model_b": {}},
+    }
+    extractions_path = tmp_path / "extractions.json"
+    extractions_path.write_text(
+        json.dumps(extractions_artifact, ensure_ascii=False)
+    )
+    posts = [
+        {
+            "id": "p1",
+            "person_name": "Арестович",
+            "published_at": "2024-01-01",
+            "text": "Some Ukrainian post text",
+        }
+    ]
+    out_path = tmp_path / "judgements.json"
+
+    response_map = {
+        "claim_a1": json.dumps(
+            {
+                "per_claim": [
+                    {
+                        "claim_text": "claim_a1",
+                        "verdict": "exact_match",
+                        "reasoning": "ok",
+                    }
+                ],
+                "missed_predictions": [],
+            }
+        ),
+    }
+
+    await run_stage2_judge(
+        judge_model="judge/test",
+        extractions_path=extractions_path,
+        posts=posts,
+        output_path=out_path,
+        judge_factory=_make_judge_factory(response_map),
+    )
+
+    saved = json.loads(out_path.read_text())
+    assert (
+        saved["judgements"]["model_a"]["p1"]["per_claim"][0]["verdict"]
+        == "exact_match"
+    )
+    # Empty extractions still get judged (returns empty per_claim)
+    assert saved["judgements"]["model_b"]["p1"]["per_claim"] == []
+
+
+async def test_stage2_skips_post_with_extraction_error(tmp_path):
+    extractions_artifact = {
+        "metadata": {"extractors": ["model_a"]},
+        "extractions": {"model_a": {"p1": [], "p2": []}},
+        "errors": {"model_a": {"p1": "RuntimeError: API down"}},
+    }
+    extractions_path = tmp_path / "extractions.json"
+    extractions_path.write_text(json.dumps(extractions_artifact))
+    posts = [
+        {"id": "p1", "person_name": "Арестович", "published_at": "2024-01-01", "text": "T"},
+        {"id": "p2", "person_name": "Арестович", "published_at": "2024-01-02", "text": "T"},
+    ]
+    out_path = tmp_path / "judgements.json"
+
+    judge_factory = _make_judge_factory({})
+
+    await run_stage2_judge(
+        judge_model="judge/test",
+        extractions_path=extractions_path,
+        posts=posts,
+        output_path=out_path,
+        judge_factory=judge_factory,
+    )
+
+    saved = json.loads(out_path.read_text())
+    # p1 was an error in Stage 1 — judge skips, marker present
+    assert (
+        saved["judgements"]["model_a"]["p1"].get("skipped_due_to_extraction_error")
+        is True
+    )
+    # p2 had empty extractions but no error → judge was called
+    assert "skipped_due_to_extraction_error" not in saved["judgements"]["model_a"]["p2"]
+
+
+async def test_stage2_handles_judge_parse_failure(tmp_path):
+    extractions_artifact = {
+        "metadata": {"extractors": ["model_a"]},
+        "extractions": {
+            "model_a": {
+                "p1": [
+                    {
+                        "claim_text": "UNIQUE_MARKER_CLAIM",
+                        "prediction_date": None,
+                        "target_date": None,
+                        "topic": "",
+                    }
+                ]
+            }
+        },
+        "errors": {"model_a": {}},
+    }
+    extractions_path = tmp_path / "extractions.json"
+    extractions_path.write_text(json.dumps(extractions_artifact))
+    posts = [
+        {"id": "p1", "person_name": "Арестович", "published_at": "2024-01-01", "text": "T"}
+    ]
+    out_path = tmp_path / "judgements.json"
+
+    # Match by claim text (which IS in the rendered judge prompt) so this
+    # response is returned only for our specific post under test.
+    response_map = {"UNIQUE_MARKER_CLAIM": "this is not valid JSON at all"}
+
+    await run_stage2_judge(
+        judge_model="judge/test",
+        extractions_path=extractions_path,
+        posts=posts,
+        output_path=out_path,
+        judge_factory=_make_judge_factory(response_map),
+    )
+
+    saved = json.loads(out_path.read_text())
+    # parse_error preserved, per_claim empty so aggregate excludes from gold_agreement
+    assert saved["judgements"]["model_a"]["p1"]["parse_error"] is not None
+    assert saved["judgements"]["model_a"]["p1"]["per_claim"] == []

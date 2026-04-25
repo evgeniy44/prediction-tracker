@@ -13,7 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from extraction_judge_prompts import VERDICT_ORDINAL, VERDICT_VALUES
+from extraction_judge_prompts import (
+    JUDGE_SYSTEM,
+    VERDICT_ORDINAL,
+    VERDICT_VALUES,
+    build_judge_prompt,
+    parse_judge_response,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +204,121 @@ async def run_stage1_extraction(
                 },
                 "extractions": extractions,
                 "errors": errors,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+# =============================================================================
+# Stage 2 — judge orchestration
+# =============================================================================
+
+
+async def run_stage2_judge(
+    judge_model: str,
+    extractions_path: Path,
+    posts: list[dict],
+    output_path: Path,
+    judge_factory: Callable,
+    concurrency: int = 1,
+    min_call_interval_seconds: float = 0.0,
+) -> None:
+    """For each (extractor, post, claims) call the judge and save verdicts.
+
+    Posts that errored in Stage 1 are skipped (marked in judgements artifact).
+    Judge response parse failures preserve `parse_error` field.
+
+    After completion, prints per-extractor parse-error counts to stderr+console
+    so the user can see infra issues at a glance (per Task 13.5 plan revision).
+    """
+    extractions_artifact = json.loads(extractions_path.read_text(encoding="utf-8"))
+    extractions = extractions_artifact["extractions"]
+    errors_map = extractions_artifact.get("errors", {})
+    posts_by_id = {p["id"]: p for p in posts}
+
+    judge_client = judge_factory(judge_model)
+    judgements: dict[str, dict[str, dict]] = {m: {} for m in extractions}
+
+    sem = asyncio.Semaphore(concurrency)
+
+    async def judge_one(
+        model_id: str, post_id: str, claims: list[dict]
+    ) -> tuple[str, str, dict]:
+        # Skip posts that errored in Stage 1
+        if post_id in errors_map.get(model_id, {}):
+            return model_id, post_id, {
+                "skipped_due_to_extraction_error": True,
+                "per_claim": [],
+                "missed_predictions": [],
+            }
+
+        post = posts_by_id.get(post_id)
+        if post is None:
+            return model_id, post_id, {
+                "skipped_post_not_found": True,
+                "per_claim": [],
+                "missed_predictions": [],
+            }
+
+        prompt = build_judge_prompt(
+            post_text=post["text"],
+            published_date=post["published_at"],
+            extracted_claims=claims,
+        )
+        async with sem:
+            try:
+                raw = await judge_client.complete(prompt, system=JUDGE_SYSTEM)
+            except Exception as e:
+                logger.exception(
+                    "Judge call failed: %s / %s", model_id, post_id
+                )
+                return model_id, post_id, {
+                    "judge_error": f"{type(e).__name__}: {e}",
+                    "per_claim": [],
+                    "missed_predictions": [],
+                }
+            if min_call_interval_seconds > 0:
+                await asyncio.sleep(min_call_interval_seconds)
+
+        parsed = parse_judge_response(raw)
+        return model_id, post_id, parsed
+
+    tasks = [
+        judge_one(m, pid, claims)
+        for m, posts_dict in extractions.items()
+        for pid, claims in posts_dict.items()
+    ]
+    results = await asyncio.gather(*tasks)
+    for model_id, post_id, parsed in results:
+        judgements[model_id][post_id] = parsed
+
+    # Surface parse_error count to console for visibility (infra signal,
+    # not model-quality signal). Aggregator excludes these from gold_agreement.
+    parse_error_summary: dict[str, int] = {}
+    for model_id, posts_dict in judgements.items():
+        n_errors = sum(1 for p in posts_dict.values() if p.get("parse_error"))
+        if n_errors > 0:
+            parse_error_summary[model_id] = n_errors
+    if parse_error_summary:
+        logger.warning(
+            "Judge parse failures: %s. Excluded from gold_agreement matrix.",
+            parse_error_summary,
+        )
+        print(f"  [stage2] judge parse failures: {parse_error_summary}")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "judge": judge_model,
+                    "source_extractions": str(extractions_path),
+                },
+                "judgements": judgements,
             },
             ensure_ascii=False,
             indent=2,
