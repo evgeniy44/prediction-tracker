@@ -227,6 +227,18 @@ async def run_stage1_extraction(
             if err:
                 errors[model_id][post_id] = err
 
+    # Merge with existing artifact if present — preserves data for extractors
+    # not in the current run, replaces data for extractors that are.
+    if output_path.exists():
+        existing = json.loads(output_path.read_text(encoding="utf-8"))
+        merged_ext = dict(existing.get("extractions", {}))
+        merged_err = dict(existing.get("errors", {}))
+        for m in extractors:
+            merged_ext[m] = extractions[m]
+            merged_err[m] = errors[m]
+        extractions = merged_ext
+        errors = merged_err
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(
@@ -234,7 +246,7 @@ async def run_stage1_extraction(
                 "metadata": {
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "dataset_size": len(filtered_posts),
-                    "extractors": list(extractors),
+                    "extractors": sorted(extractions.keys()),
                     "author_filter": author_filter,
                 },
                 "extractions": extractions,
@@ -344,6 +356,15 @@ async def run_stage2_judge(
         )
         print(f"  [stage2] judge parse failures: {parse_error_summary}")
 
+    # Merge with existing artifact if present — preserves judgements for
+    # extractors not in the current run, replaces those that are.
+    if output_path.exists():
+        existing = json.loads(output_path.read_text(encoding="utf-8"))
+        merged = dict(existing.get("judgements", {}))
+        for m in judgements:
+            merged[m] = judgements[m]
+        judgements = merged
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(
@@ -403,6 +424,7 @@ PRIMARY_EXTRACTORS: tuple[str, ...] = (
     "gemini/gemini-3.1-flash-lite-preview",
     "deepseek/deepseek-chat",
     "anthropic/claude-sonnet-4-6",
+    "gemini/gemini-3-flash-preview",  # added 2026-04-21 for cross-tier Gemini comparison
 )
 DEFAULT_JUDGE = "anthropic/claude-opus-4-6"
 
@@ -412,6 +434,9 @@ DEFAULT_JUDGE = "anthropic/claude-opus-4-6"
 # under 30k ITPM with margin: concurrency=1 + 4s sleep = 15 RPM × 1500 = 22.5k ITPM.
 CONCURRENCY_OVERRIDES.setdefault("anthropic/claude-opus-4-6", 1)
 MIN_CALL_INTERVAL_SECONDS.setdefault("anthropic/claude-opus-4-6", 4.0)
+# Gemini 3 Flash Preview shares free-tier 15 RPM with Flash Lite Preview.
+CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3-flash-preview", 1)
+MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3-flash-preview", 7.0)
 
 PROJECT_ROOT = Path(__file__).parent.parent
 DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "gold_labels.json"
