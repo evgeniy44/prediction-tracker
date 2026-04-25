@@ -702,3 +702,169 @@ def test_cli_parses_extractors_csv():
         ["--extractors", "gemini/x,deepseek/y"]
     )
     assert args.extractors == "gemini/x,deepseek/y"
+
+
+# =============================================================================
+# Group C2 — End-to-end pipeline (all 3 stages, mocked LLMs)
+# =============================================================================
+
+
+async def test_full_pipeline_synthetic_data(tmp_path):
+    """Stage 1 → Stage 2 → Stage 3 with mocked extractor + judge."""
+    posts = [
+        {
+            "id": "p1",
+            "person_name": "Арестович",
+            "published_at": "2024-01-01",
+            "text": "Контрнаступ почнеться влітку 2023",
+        },
+        {
+            "id": "p2",
+            "person_name": "Арестович",
+            "published_at": "2024-01-02",
+            "text": "Сьогодні погода гарна",
+        },
+    ]
+    gold_path = tmp_path / "gold.json"
+    gold_path.write_text(
+        json.dumps(
+            [
+                {"id": "p1", "has_prediction": True},
+                {"id": "p2", "has_prediction": False},
+            ]
+        )
+    )
+
+    extractions_path = tmp_path / "extraction_outputs.json"
+    judgements_path = tmp_path / "extraction_judgements.json"
+    report_path = tmp_path / "extraction_eval_report.json"
+
+    # Mock extractor: extracts 1 claim from p1, none from p2
+    claim_map = {
+        "model_test": {"p1": ["Контрнаступ почнеться влітку 2023"], "p2": []},
+    }
+    await run_stage1_extraction(
+        extractors=["model_test"],
+        posts=posts,
+        author_filter="Арестович",
+        output_path=extractions_path,
+        extractor_factory=_make_factory(claim_map),
+    )
+
+    # Mock judge: rates the claim as exact_match (matched by claim_text substring in prompt)
+    judge_response = json.dumps(
+        {
+            "per_claim": [
+                {
+                    "claim_text": "Контрнаступ почнеться влітку 2023",
+                    "verdict": "exact_match",
+                    "reasoning": "Verbatim quote",
+                }
+            ],
+            "missed_predictions": [],
+        }
+    )
+    await run_stage2_judge(
+        judge_model="judge/test",
+        extractions_path=extractions_path,
+        posts=posts,
+        output_path=judgements_path,
+        judge_factory=_make_judge_factory({"Контрнаступ": judge_response}),
+    )
+
+    report = run_stage3_aggregate(
+        judgements_path=judgements_path,
+        gold_labels_path=gold_path,
+        output_path=report_path,
+    )
+
+    m = report["per_model"]["model_test"]
+    assert m["total_claims"] == 1
+    assert m["verdict_distribution"]["exact_match"] == 1
+    assert m["avg_quality_score"] == pytest.approx(3.0)
+    assert m["gold_agreement"]["gold_YES_with_valid_extraction"] == 1
+    assert m["gold_agreement"]["gold_NO_without_valid_extractions"] == 1
+
+
+async def test_re_run_stage_2_only_uses_existing_extractions(tmp_path):
+    """Demonstrates artifact-based re-runs: Stage 1 once, Stage 2 multiple times."""
+    posts = [
+        {
+            "id": "p1",
+            "person_name": "Арестович",
+            "published_at": "2024-01-01",
+            "text": "T",
+        }
+    ]
+    gold_path = tmp_path / "gold.json"
+    gold_path.write_text(json.dumps([{"id": "p1", "has_prediction": True}]))
+    extractions_path = tmp_path / "extraction_outputs.json"
+
+    await run_stage1_extraction(
+        extractors=["model_a"],
+        posts=posts,
+        author_filter="Арестович",
+        output_path=extractions_path,
+        extractor_factory=_make_factory({"model_a": {"p1": ["UNIQUE_CLAIM_X"]}}),
+    )
+
+    # Run Stage 2 with judge_v1
+    judgements_v1 = tmp_path / "judgements_v1.json"
+    await run_stage2_judge(
+        judge_model="judge/v1",
+        extractions_path=extractions_path,
+        posts=posts,
+        output_path=judgements_v1,
+        judge_factory=_make_judge_factory(
+            {
+                "UNIQUE_CLAIM_X": json.dumps(
+                    {
+                        "per_claim": [
+                            {
+                                "claim_text": "UNIQUE_CLAIM_X",
+                                "verdict": "exact_match",
+                                "reasoning": "v1",
+                            }
+                        ],
+                        "missed_predictions": [],
+                    }
+                )
+            }
+        ),
+    )
+
+    # Same Stage 1 artifact, different judge — Stage 1 NOT re-run
+    judgements_v2 = tmp_path / "judgements_v2.json"
+    await run_stage2_judge(
+        judge_model="judge/v2",
+        extractions_path=extractions_path,
+        posts=posts,
+        output_path=judgements_v2,
+        judge_factory=_make_judge_factory(
+            {
+                "UNIQUE_CLAIM_X": json.dumps(
+                    {
+                        "per_claim": [
+                            {
+                                "claim_text": "UNIQUE_CLAIM_X",
+                                "verdict": "hallucination",
+                                "reasoning": "v2 disagrees",
+                            }
+                        ],
+                        "missed_predictions": [],
+                    }
+                )
+            }
+        ),
+    )
+
+    j1 = json.loads(judgements_v1.read_text())
+    j2 = json.loads(judgements_v2.read_text())
+    assert (
+        j1["judgements"]["model_a"]["p1"]["per_claim"][0]["verdict"]
+        == "exact_match"
+    )
+    assert (
+        j2["judgements"]["model_a"]["p1"]["per_claim"][0]["verdict"]
+        == "hallucination"
+    )
