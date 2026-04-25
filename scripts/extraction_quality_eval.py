@@ -171,19 +171,35 @@ async def run_stage1_extraction(
     output_path: Path,
     extractor_factory: Callable,
     concurrency: int = 5,
+    per_model_concurrency: dict[str, int] | None = None,
+    per_model_min_interval: dict[str, float] | None = None,
 ) -> None:
     """Run each extractor over filtered posts, save full extractions to disk.
 
     Errors during extraction are logged into a separate `errors` map per model;
     the post still appears in `extractions` with an empty claims list.
+
+    Per-model rate-limit safety:
+      - per_model_concurrency: override semaphore size for specific models
+      - per_model_min_interval: forced sleep (seconds) after each call,
+        only effective when concurrency=1 (otherwise parallel tasks bypass it)
     """
     filtered_posts = [p for p in posts if p["person_name"] == author_filter]
     extractions: dict[str, dict[str, list[dict]]] = {m: {} for m in extractors}
     errors: dict[str, dict[str, str]] = {m: {} for m in extractors}
+    per_model_concurrency = per_model_concurrency or {}
+    per_model_min_interval = per_model_min_interval or {}
 
     for model_id in extractors:
         extractor = extractor_factory(model_id)
-        sem = asyncio.Semaphore(concurrency)
+        effective_concurrency = per_model_concurrency.get(model_id, concurrency)
+        min_interval = per_model_min_interval.get(model_id, 0.0)
+        sem = asyncio.Semaphore(effective_concurrency)
+        if min_interval > 0:
+            print(
+                f"  [stage1] {model_id}: concurrency={effective_concurrency}, "
+                f"min_interval={min_interval}s/call"
+            )
 
         async def process(post: dict) -> tuple[str, list[dict], str | None]:
             async with sem:
@@ -195,12 +211,15 @@ async def run_stage1_extraction(
                         person_name=post["person_name"],
                         published_date=post["published_at"],
                     )
-                    return post["id"], [_serialize_prediction(p) for p in preds], None
+                    result = post["id"], [_serialize_prediction(p) for p in preds], None
                 except Exception as e:
                     logger.exception(
                         "Extraction failed for %s on %s", model_id, post["id"]
                     )
-                    return post["id"], [], f"{type(e).__name__}: {e}"
+                    result = post["id"], [], f"{type(e).__name__}: {e}"
+                if min_interval > 0:
+                    await asyncio.sleep(min_interval)
+                return result
 
         results = await asyncio.gather(*(process(p) for p in filtered_posts))
         for post_id, claims, err in results:
@@ -492,6 +511,8 @@ async def _main_async(args: argparse.Namespace) -> None:
             author_filter=args.author,
             output_path=extractions_path,
             extractor_factory=_default_extractor_factory,
+            per_model_concurrency=CONCURRENCY_OVERRIDES,
+            per_model_min_interval=MIN_CALL_INTERVAL_SECONDS,
         )
         print(f"  ✓ saved {extractions_path}")
 
