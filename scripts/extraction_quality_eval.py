@@ -406,6 +406,13 @@ PRIMARY_EXTRACTORS: tuple[str, ...] = (
 )
 DEFAULT_JUDGE = "anthropic/claude-opus-4-6"
 
+# Extend Task 13 throttle dicts with Task 13.5-specific judge limits.
+# Anthropic Opus 4.6 has 30,000 ITPM on lower tiers. Each judge call is
+# ~1500 input tokens (post + claims + JUDGE_SYSTEM guidelines). To stay
+# under 30k ITPM with margin: concurrency=1 + 4s sleep = 15 RPM × 1500 = 22.5k ITPM.
+CONCURRENCY_OVERRIDES.setdefault("anthropic/claude-opus-4-6", 1)
+MIN_CALL_INTERVAL_SECONDS.setdefault("anthropic/claude-opus-4-6", 4.0)
+
 PROJECT_ROOT = Path(__file__).parent.parent
 DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "gold_labels.json"
 DEFAULT_POSTS_PATH = PROJECT_ROOT / "scripts" / "sample_posts.json"
@@ -483,6 +490,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Limit posts processed (for dry run / debugging)",
     )
+    parser.add_argument(
+        "--gold-only",
+        action="store_true",
+        default=False,
+        help="Process only posts that appear in gold_labels.json (97 for Arestovich)",
+    )
     return parser
 
 
@@ -496,6 +509,11 @@ async def _main_async(args: argparse.Namespace) -> None:
 
     if 1 in stages:
         posts = json.loads(Path(args.posts).read_text(encoding="utf-8"))
+        if args.gold_only:
+            gold = json.loads(Path(args.gold).read_text(encoding="utf-8"))
+            gold_ids = {g["id"] for g in gold}
+            posts = [p for p in posts if p["id"] in gold_ids]
+            print(f"  (gold-only: subset to {len(posts)} posts in gold_labels)")
         if args.limit is not None:
             posts = [p for p in posts if p["person_name"] == args.author][
                 : args.limit
