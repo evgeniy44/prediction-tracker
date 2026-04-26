@@ -9,5 +9,10 @@ dist/
 *.session-journal
 .superpowers/
 /.idea/
-scripts/sample_posts.json
+scripts/data/sample_posts.json
+scripts/data/sample_posts_100.json
+scripts/data/arestovich/
+scripts/data/zdanov/
+scripts/data/_legacy/
+scripts/outputs/
 scripts/smoke_results.json

@@ -48,7 +48,7 @@ DATE_TO   = datetime(2026, 1, 1, tzinfo=timezone.utc)
 # To get even distribution across years we scan the full history
 # and sample evenly afterwards
 EVEN_SAMPLE = True
-OUTPUT = Path(__file__).parent / "arestovich/all.json"
+OUTPUT = Path(__file__).parent / "data" / "arestovich" / "all.json"
 SESSION_PATH = str(Path(__file__).parent / "tg_session")
 
 

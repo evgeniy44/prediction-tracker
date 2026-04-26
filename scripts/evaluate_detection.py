@@ -56,9 +56,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 PROJECT_ROOT = Path(__file__).parent.parent
-GOLD_LABELS_PATH = PROJECT_ROOT / "scripts" / "gold_labels.json"
-SAMPLE_POSTS_PATH = PROJECT_ROOT / "scripts" / "sample_posts.json"
-RESULTS_DIR = PROJECT_ROOT / "scripts"
+GOLD_LABELS_PATH = PROJECT_ROOT / "scripts" / "data" / "gold_labels.json"
+SAMPLE_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "sample_posts.json"
+RESULTS_DIR = PROJECT_ROOT / "scripts" / "outputs" / "detection_eval"
 
 EMBEDDING_DIM = 1536  # must match pgvector Vector(1536) column in ORM
 

@@ -20,6 +20,18 @@ from typing import Callable
 # (scripts/ is already on sys.path implicitly when running this file directly.)
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+# Load .env early so provider API keys (ANTHROPIC_API_KEY, GEMINI_API_KEY, ...)
+# are available to litellm regardless of whether the user exported them in shell.
+# override=True is critical: parent shells sometimes export keys as empty strings,
+# which load_dotenv treats as "already set" and skips by default — losing the real
+# values from .env.
+try:
+    from dotenv import load_dotenv  # noqa: E402
+
+    load_dotenv(Path(__file__).parent.parent / ".env", override=True)
+except ImportError:
+    pass  # dotenv optional; fallback to environment
+
 from extraction_judge_prompts import (  # noqa: E402
     JUDGE_SYSTEM,
     VERDICT_ORDINAL,
@@ -272,19 +284,30 @@ async def run_stage2_judge(
     judge_factory: Callable,
     concurrency: int = 1,
     min_call_interval_seconds: float = 0.0,
+    extractors_filter: set[str] | None = None,
 ) -> None:
     """For each (extractor, post, claims) call the judge and save verdicts.
 
     Posts that errored in Stage 1 are skipped (marked in judgements artifact).
     Judge response parse failures preserve `parse_error` field.
 
+    `extractors_filter` (optional): if set, only judge claims from these
+    extractor models. Useful for incremental runs after adding a new model
+    — old extractors' judgements stay intact via merge-mode below.
+
+    `posts` already constrains which post_ids are judged; pass a filtered
+    list (e.g. gold-only) to avoid spending judge time on irrelevant posts.
+
     After completion, prints per-extractor parse-error counts to stderr+console
     so the user can see infra issues at a glance (per Task 13.5 plan revision).
     """
     extractions_artifact = json.loads(extractions_path.read_text(encoding="utf-8"))
     extractions = extractions_artifact["extractions"]
+    if extractors_filter is not None:
+        extractions = {m: v for m, v in extractions.items() if m in extractors_filter}
     errors_map = extractions_artifact.get("errors", {})
     posts_by_id = {p["id"]: p for p in posts}
+    allowed_post_ids = set(posts_by_id.keys())
 
     judge_client = judge_factory(judge_model)
     judgements: dict[str, dict[str, dict]] = {m: {} for m in extractions}
@@ -337,8 +360,20 @@ async def run_stage2_judge(
         judge_one(m, pid, claims)
         for m, posts_dict in extractions.items()
         for pid, claims in posts_dict.items()
+        if pid in allowed_post_ids
     ]
-    results = await asyncio.gather(*tasks)
+    print(f"  [stage2] judging {len(tasks)} (extractor, post) pairs...", flush=True)
+    # Stream progress: log each completion via as_completed instead of gather
+    results = []
+    completed = 0
+    for coro in asyncio.as_completed(tasks):
+        result = await coro
+        results.append(result)
+        completed += 1
+        if completed % 5 == 0 or completed == len(tasks):
+            print(
+                f"  [stage2] {completed}/{len(tasks)} done", flush=True
+            )
     for model_id, post_id, parsed in results:
         judgements[model_id][post_id] = parsed
 
@@ -433,18 +468,21 @@ DEFAULT_JUDGE = "anthropic/claude-opus-4-6"
 # ~1500 input tokens (post + claims + JUDGE_SYSTEM guidelines). To stay
 # under 30k ITPM with margin: concurrency=1 + 4s sleep = 15 RPM × 1500 = 22.5k ITPM.
 CONCURRENCY_OVERRIDES.setdefault("anthropic/claude-opus-4-6", 1)
-MIN_CALL_INTERVAL_SECONDS.setdefault("anthropic/claude-opus-4-6", 4.0)
+# Anthropic 30k ITPM tier: ~3k tokens/call × 7.5 RPM = ~22.5k ITPM, safely under
+# limit. Earlier 4s gave 15 RPM = 45k ITPM and triggered silent rate-limit deaths.
+MIN_CALL_INTERVAL_SECONDS.setdefault("anthropic/claude-opus-4-6", 8.0)
 # Gemini 3 Flash Preview shares free-tier 15 RPM with Flash Lite Preview.
 CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3-flash-preview", 1)
 MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3-flash-preview", 7.0)
-# Gemini 3.1 Pro Preview — free tier RPM is even tighter than Flash Lite, but
-# 7s should be safe; bumped to 8s for extra margin on premium-tier preview.
-CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3.1-pro-preview", 1)
-MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3.1-pro-preview", 8.0)
+# Gemini 3.1 Pro Preview — Tier 1 paid tier gives ~150 RPM; throttle to ~30 RPM
+# (concurrency=2 + 1s) for safety against bursty token-per-minute caps.
+CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3.1-pro-preview", 2)
+MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3.1-pro-preview", 1.0)
 
 PROJECT_ROOT = Path(__file__).parent.parent
-DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "gold_labels.json"
-DEFAULT_POSTS_PATH = PROJECT_ROOT / "scripts" / "sample_posts.json"
+DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "data" / "gold_labels.json"
+DEFAULT_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "sample_posts.json"
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "scripts" / "outputs" / "extraction_eval"
 
 
 def _judge_factory(model_id: str) -> LLMClient:
@@ -495,7 +533,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--output-dir",
-        default=str(PROJECT_ROOT / "scripts"),
+        default=str(DEFAULT_OUTPUT_DIR),
         help="Where to write JSON artifacts",
     )
     parser.add_argument(
@@ -565,6 +603,11 @@ async def _main_async(args: argparse.Namespace) -> None:
 
     if 2 in stages:
         posts = json.loads(Path(args.posts).read_text(encoding="utf-8"))
+        if args.gold_only:
+            gold = json.loads(Path(args.gold).read_text(encoding="utf-8"))
+            gold_ids = {g["id"] for g in gold}
+            posts = [p for p in posts if p["id"] in gold_ids]
+            print(f"  (gold-only: judge subset to {len(posts)} posts)")
         if args.limit is not None:
             posts = [p for p in posts if p["person_name"] == args.author][
                 : args.limit
@@ -572,8 +615,12 @@ async def _main_async(args: argparse.Namespace) -> None:
         # Per-judge concurrency override (Opus paid tier supports higher concurrency)
         concurrency = CONCURRENCY_OVERRIDES.get(args.judge, 3)
         min_interval = MIN_CALL_INTERVAL_SECONDS.get(args.judge, 0.0)
+        # If --extractors was passed, judge only those models' claims and merge
+        # with existing judgements for everyone else (incremental mode).
+        extractors_filter = set(extractors) if extractors else None
         print(
             f"Stage 2: judging with {args.judge} (concurrency={concurrency})"
+            + (f", filter={sorted(extractors_filter)}" if extractors_filter else "")
         )
         await run_stage2_judge(
             judge_model=args.judge,
@@ -583,6 +630,7 @@ async def _main_async(args: argparse.Namespace) -> None:
             judge_factory=_judge_factory,
             concurrency=concurrency,
             min_call_interval_seconds=min_interval,
+            extractors_filter=extractors_filter,
         )
         print(f"  ✓ saved {judgements_path}")
 
