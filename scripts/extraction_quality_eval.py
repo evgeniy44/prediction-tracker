@@ -437,6 +437,10 @@ MIN_CALL_INTERVAL_SECONDS.setdefault("anthropic/claude-opus-4-6", 4.0)
 # Gemini 3 Flash Preview shares free-tier 15 RPM with Flash Lite Preview.
 CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3-flash-preview", 1)
 MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3-flash-preview", 7.0)
+# Gemini 3.1 Pro Preview — free tier RPM is even tighter than Flash Lite, but
+# 7s should be safe; bumped to 8s for extra margin on premium-tier preview.
+CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3.1-pro-preview", 1)
+MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3.1-pro-preview", 8.0)
 
 PROJECT_ROOT = Path(__file__).parent.parent
 DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "gold_labels.json"
