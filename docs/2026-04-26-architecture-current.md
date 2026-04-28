@@ -304,17 +304,31 @@ Domain models (Pydantic, src/prophet_checker/models/domain.py):
 │   PostgresSourceRepository.get_unprocessed_documents()              │
 │        │                                                            │
 │        ▼ for each unprocessed document                              │
+│   📋 src/prophet_checker/analysis/detector.py:PredictionDetector    │
+│        │   .has_prediction(text) -> bool                            │
+│        │   uses: cheap model (Flash Lite, F1=0.848 from Task 13)    │
+│        │   purpose: skip 80%+ of posts that contain no predictions │
+│        │   STATUS: Task 13 produced only an eval script,            │
+│        │           no production class yet                          │
+│        ▼ (only if has_prediction == True)                           │
 │   src/prophet_checker/analysis/extractor.py:PredictionExtractor     │
 │        │   .extract(doc.text, ...) -> list[Prediction]              │
 │        │   ↑ also generates embedding via LLMClient.embed()         │
 │        ▼                                                            │
 │   PostgresPredictionRepository.save(prediction)                     │
 │   PostgresVectorStore.store_embedding(pred_id, embedding)           │
-│        │                                                            │
-│        │   📋 OPEN QUESTION: detection prefilter перед extractor?   │
-│        │       Flash Lite YES/NO детект → тільки YES йде на extract │
-│        │       Зекономило би ~5-10× коштів. Не вирішено — TBD.      │
-│        │                                                            │
+│                                                                     │
+│   📋 OPEN QUESTION 1: do we need explicit detector at all?          │
+│       Without it: PredictionExtractor returns [] for posts without  │
+│       predictions — implicit detection. Costs ~17% wasted calls     │
+│       on Flash Lite (cheap). But for Pro Preview / two-tier         │
+│       strategy, explicit Detector saves ~85% (see                   │
+│       docs/2026-04-26-gemini-pro-vs-lite-cost.md, "Option C").     │
+│   📋 OPEN QUESTION 2: which model for detection?                    │
+│       Task 13 winner = Flash Lite (F1=0.848). Could same model      │
+│       serve both detection and extraction (single LLM call          │
+│       returning empty array on NO)?                                 │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -325,8 +339,12 @@ Domain models (Pydantic, src/prophet_checker/models/domain.py):
 │        │                                                           │
 │        ▼                                                           │
 │   PostgresPredictionRepository.get_unverified()                    │
-│        │   where status=UNRESOLVED AND target_date < NOW()         │
-│        ▼ for each unverified prediction with target_date passed    │
+│        │   CURRENTLY: WHERE status=UNRESOLVED AND verified_at IS    │
+│        │              NULL — no time gate at all                    │
+│        │   🚨 BUG: returns predictions whose event hasn't happened  │
+│        │       yet (e.g. "Війна закінчиться у 2027" verified today  │
+│        │       — meaningless)                                       │
+│        ▼ for each unverified prediction                             │
 │   src/prophet_checker/analysis/verifier.py:PredictionVerifier      │
 │        │   .verify(pred) → updated Prediction with                 │
 │        │   {status, confidence, evidence_url, evidence_text,       │
@@ -334,7 +352,20 @@ Domain models (Pydantic, src/prophet_checker/models/domain.py):
 │        ▼                                                           │
 │   PostgresPredictionRepository.update(pred)                        │
 │                                                                    │
-│   📋 OPEN QUESTION: де брати news для верифікації?                 │
+│   🚨 OPEN QUESTION 1: WHEN is a prediction eligible for             │
+│      verification? Critical because target_date is NULL in         │
+│      ~70-90% of extracted claims (LLMs rarely produce a deadline). │
+│      Candidate policies (needs separate brainstorm):                │
+│        • Strict: target_date IS NOT NULL AND target_date < NOW()    │
+│          (excludes 70-90% of corpus — likely too restrictive)      │
+│        • Soft fallback: + prediction_date + Δ for null cases       │
+│        • LLM-as-gatekeeper: per-prediction "is this verifiable     │
+│          now?" call before each verify attempt                      │
+│        • Multi-tier: target_date defined → strict; null → re-      │
+│          extract from text; vague → manual queue                    │
+│      No decision made yet. See followup brainstorm.                 │
+│                                                                    │
+│   📋 OPEN QUESTION 2: де брати news для верифікації?                │
 │       — окремий NewsCollector (Task 22)?                           │
 │       — web search в LLMClient (LiteLLM web_search_options)?        │
 │                                                                    │
@@ -373,6 +404,13 @@ Domain models (Pydantic, src/prophet_checker/models/domain.py):
 - 📋 Task 21: `src/prophet_checker/sources/telegram.py` — переселення з `scripts/`
 - 📋 Task 22: `src/prophet_checker/sources/news.py` — для verification
 - 📋 Bot module + scheduler (поки без task номерів)
+- 🚨 **Verification trigger policy** — окремий followup brainstorm.
+  Поточний `get_unverified()` ігнорує час; потрібно вирішити ЯК і КОЛИ
+  predictions стають eligible (target_date null у 70-90% claims).
+- 📋 **`src/prophet_checker/analysis/detector.py`** — productionize Task 13
+  Detection winner (Flash Lite) як explicit pipeline stage. Опціональний
+  для single-Flash-Lite extraction; обов'язковий для two-tier (Flash Lite
+  detect → Pro Preview extract).
 
 ---
 
@@ -405,9 +443,19 @@ Domain models (Pydantic, src/prophet_checker/models/domain.py):
 4. **Task 21** — `src/sources/telegram.py`: переселення `scripts/collect_telegram_posts.py` в src/-модуль через `Source.collect()` інтерфейс.
 
 **Open architectural questions** (не вирішено в цьому doc):
-- Detection prefilter перед extraction в Flow 5b? Може зекономити 5-10× коштів. Спроектувати окремо при Task 15.
-- Two-stage extraction: Flash Lite (sourcing) + Pro Preview (precision filter)? Hypothesized в cost-comparison doc, потребує proof-of-concept на ~50 постах.
-- Чи додавати eval-loop у production як continuous quality monitoring? Зараз eval — manual one-off; майбутнє — можливо щоденний sample-based health check.
+- 🚨 **Verification trigger policy** — критичне. Коли prediction стає eligible
+  для verification? `target_date` null у 70-90% claims. 5 кандидатів-політик
+  (strict / soft fallback / LLM-gatekeeper / multi-tier / open-ended periodic).
+  Без цього `PredictionVerifier` фактично не можна включити в продукт. Окремий
+  brainstorm перед Task 15.
+- Detection prefilter перед extraction у Flow 5b? Може зекономити ~85 % коштів
+  при two-tier strategy (Pro Preview як second-stage). Спроектувати окремо
+  при Task 15.
+- Two-stage extraction: Flash Lite (sourcing) + Pro Preview (precision filter)?
+  Hypothesized в cost-comparison doc, потребує proof-of-concept на ~50 постах.
+- Чи додавати eval-loop у production як continuous quality monitoring?
+  Зараз eval — manual one-off; майбутнє — можливо щоденний sample-based health
+  check.
 
 Ці питання — кандидати на наступний architecture refresh (Option B/C у початковому brainstormі).
 
