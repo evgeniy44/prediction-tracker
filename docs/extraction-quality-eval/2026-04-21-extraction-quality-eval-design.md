@@ -2,7 +2,7 @@
 
 **Status:** Design approved, ready for implementation plan
 **Date:** 2026-04-21
-**Related:** Detection eval ([Task 13](2026-04-08-prophet-checker-plan.md)), annotation guidelines ([docs](annotation-guidelines.md))
+**Related:** Detection eval ([Task 13](../plan/2026-04-08-prophet-checker-plan.md)), annotation guidelines ([docs](../annotation/annotation-guidelines.md))
 
 ## Context & Problem
 
@@ -105,7 +105,7 @@ Wall time estimate: ~2-3 hours (extraction with concurrency, judge sequential).
 - **EN instructions** (standard best practice, Opus strongest on EN instructions)
 - **UA/RU content** verbatim (post text + extracted claims)
 - **Published date** of post (for date-sanity checks and historical context)
-- **Annotation guidelines** embedded in system prompt: 3-criteria YES test + 6-category NO rubric (from [annotation-guidelines.md](annotation-guidelines.md))
+- **Annotation guidelines** embedded in system prompt: 3-criteria YES test + 6-category NO rubric (from [annotation-guidelines.md](../annotation/annotation-guidelines.md))
 - **Extracted claims** from ONE extractor at a time (per-post, blind extractor identity, one model per judge call)
 
 ### What the judge does NOT see
@@ -243,7 +243,7 @@ Ordinal mapping provides scalar `quality_score` for ranking; verdict distributio
 | `_default_extractor_factory` ([evaluate_detection.py](../scripts/evaluate_detection.py)) | Model instantiation |
 | `CONCURRENCY_OVERRIDES`, `MIN_CALL_INTERVAL_SECONDS` ([evaluate_detection.py](../scripts/evaluate_detection.py)) | Rate-limit safe | 
 | `EXTRACTION_SYSTEM`, `EXTRACTION_TEMPLATE` ([src/prophet_checker/llm/prompts.py](../src/prophet_checker/llm/prompts.py)) | v2 prompt that participants will use |
-| Annotation guidelines ([docs/annotation-guidelines.md](annotation-guidelines.md)) | Source of 3-criteria YES + 6-category NO rules for judge prompt |
+| Annotation guidelines ([docs/annotation-guidelines.md](../annotation/annotation-guidelines.md)) | Source of 3-criteria YES + 6-category NO rules for judge prompt |
 
 ### No changes to existing production code
 

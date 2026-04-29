@@ -1824,6 +1824,6 @@ These are NOT blockers for this plan — they go into Task 15 plan or later:
 ## Cross-references
 
 - Spec: [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md)
-- Architecture refresh: [`2026-04-26-architecture-current.md`](2026-04-26-architecture-current.md)
+- Architecture refresh: [`2026-04-26-architecture-current.md`](../architecture/2026-04-26-architecture-current.md)
 - v1 empirical test results: `scripts/outputs/extraction_eval/verifier_4status_test.json`
-- Master plan: [`2026-04-08-prophet-checker-plan.md`](2026-04-08-prophet-checker-plan.md)
+- Master plan: [`2026-04-08-prophet-checker-plan.md`](../plan/2026-04-08-prophet-checker-plan.md)

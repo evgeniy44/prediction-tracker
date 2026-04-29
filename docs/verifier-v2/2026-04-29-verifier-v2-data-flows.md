@@ -503,5 +503,5 @@ T_n — eventually one of two things happens
 
 - Spec: [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md)
 - Implementation plan: [`2026-04-29-verification-trigger-policy-plan.md`](2026-04-29-verification-trigger-policy-plan.md)
-- Architecture refresh (where Flow 5b lives): [`2026-04-26-architecture-current.md`](2026-04-26-architecture-current.md)
+- Architecture refresh (where Flow 5b lives): [`2026-04-26-architecture-current.md`](../architecture/2026-04-26-architecture-current.md)
 - v1 empirical baseline: `scripts/outputs/extraction_eval/verifier_4status_test.json`

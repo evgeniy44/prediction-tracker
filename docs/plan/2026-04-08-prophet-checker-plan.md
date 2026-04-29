@@ -49,8 +49,8 @@
 ### Active follow-up specs
 
 - **Task 13.5 — Extraction Quality Eval** (📋 plan ready, not executed)
-  - Spec: [`2026-04-21-extraction-quality-eval-design.md`](2026-04-21-extraction-quality-eval-design.md) (commit `403f2fb`)
-  - Plan: [`2026-04-21-extraction-quality-eval-plan.md`](2026-04-21-extraction-quality-eval-plan.md) (commit `ee0b052`)
+  - Spec: [`2026-04-21-extraction-quality-eval-design.md`](../extraction-quality-eval/2026-04-21-extraction-quality-eval-design.md) (commit `403f2fb`)
+  - Plan: [`2026-04-21-extraction-quality-eval-plan.md`](../extraction-quality-eval/2026-04-21-extraction-quality-eval-plan.md) (commit `ee0b052`)
 
 ### Recent commits
 
@@ -2527,7 +2527,7 @@ git push
 
 ## Task 12: Gold Labels — ручна розмітка 50 постів ✅ COMPLETE (commits 428aea4 → a992e0f)
 
-> **Retrospective:** Originally planned 50 binary labels. Extended to **130 labels** (16 YES / 114 NO) on 2026-04-18 to support Task 13 detection eval — original 3/47 YES/NO split was too skewed for meaningful P/R/F1. Arestovich subset: 97 labels (15 YES / 82 NO, 15.5% — matches predicted base rate). [`docs/annotation-guidelines.md`](annotation-guidelines.md) refined with 4 hard-pattern edge cases (timestamp lists, slogans, normative, vague) discovered during annotation.
+> **Retrospective:** Originally planned 50 binary labels. Extended to **130 labels** (16 YES / 114 NO) on 2026-04-18 to support Task 13 detection eval — original 3/47 YES/NO split was too skewed for meaningful P/R/F1. Arestovich subset: 97 labels (15 YES / 82 NO, 15.5% — matches predicted base rate). [`docs/annotation-guidelines.md`](../annotation/annotation-guidelines.md) refined with 4 hard-pattern edge cases (timestamp lists, slogans, normative, vague) discovered during annotation.
 
 **Files:**
 - Create: `prediction-tracker/docs/annotation-guidelines.md`
@@ -2674,7 +2674,7 @@ git push
 
 **Outstanding open items:**
 - Detection F1 ≥ 0.80 only for 1/5 models. Whether prompt should be model-specific (lighter version for smaller models) — deferred. Solo project: Gemini wins, no need to make Llama/Haiku work.
-- Extraction quality (claim_text faithfulness, hallucination, coverage) — NOT measured in Task 13. Spawned **[Task 13.5: Extraction Quality Eval](2026-04-21-extraction-quality-eval-plan.md)** with LLM-as-judge approach.
+- Extraction quality (claim_text faithfulness, hallucination, coverage) — NOT measured in Task 13. Spawned **[Task 13.5: Extraction Quality Eval](../extraction-quality-eval/2026-04-21-extraction-quality-eval-plan.md)** with LLM-as-judge approach.
 
 **🏁 Task 13 closed.** Continue to Task 13.5 (extraction quality) before Task 14 smoke test.
 
@@ -2687,8 +2687,8 @@ git push
 **Approach:** 3-stage pipeline — Stage 1 captures full extraction outputs from 3 models (Gemini 3.1 Flash Lite, DeepSeek V3.1, Sonnet 4.6); Stage 2 invokes Claude Opus 4.6 as judge to assign 6-value categorical verdicts (`exact_match` / `faithful_paraphrase` / `valid_but_metadata_error` / `not_a_prediction` / `truncated` / `hallucination`) to each extracted claim; Stage 3 aggregates per-model metrics including hallucination rate, missed predictions, and gold-label agreement matrix.
 
 **Files (specs):**
-- Spec: [`2026-04-21-extraction-quality-eval-design.md`](2026-04-21-extraction-quality-eval-design.md) (commit `403f2fb`)
-- Implementation plan: [`2026-04-21-extraction-quality-eval-plan.md`](2026-04-21-extraction-quality-eval-plan.md) (commit `ee0b052`) — 10 detailed tasks, ~27 TDD tests, no production code changes
+- Spec: [`2026-04-21-extraction-quality-eval-design.md`](../extraction-quality-eval/2026-04-21-extraction-quality-eval-design.md) (commit `403f2fb`)
+- Implementation plan: [`2026-04-21-extraction-quality-eval-plan.md`](../extraction-quality-eval/2026-04-21-extraction-quality-eval-plan.md) (commit `ee0b052`) — 10 detailed tasks, ~27 TDD tests, no production code changes
 
 **Files (will be created during execution):**
 - `scripts/extraction_judge_prompts.py` — judge SYSTEM/USER templates, 6-value verdict enum, parse helpers
@@ -2715,7 +2715,7 @@ git push
 - `gold_agreement` matrix populated (cross-tab judge verdicts vs our gold labels)
 - No regression in existing 63 tests
 
-**Implementation steps:** see [implementation plan](2026-04-21-extraction-quality-eval-plan.md). Decomposed into 4 milestones (M1 pure functions / M2 stage runners / M3 CLI+integration / M4 real run).
+**Implementation steps:** see [implementation plan](../extraction-quality-eval/2026-04-21-extraction-quality-eval-plan.md). Decomposed into 4 milestones (M1 pure functions / M2 stage runners / M3 CLI+integration / M4 real run).
 
 **🏁 End of Task 13.5.** STOP. Report final metrics + production decision (which model wins extraction quality, ranked alongside Task 13 detection F1). Brainstorm next steps with user (LinkedIn post / Task 14 revival / proceed to M3 Orchestration).
 

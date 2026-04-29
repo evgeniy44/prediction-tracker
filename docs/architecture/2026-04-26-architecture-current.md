@@ -16,7 +16,7 @@
 | Detection eval pipeline (YES/NO classifier benchmark) | NEW ✅ | Task 13 — emergent потреба після виявлення проблем з extraction quality |
 | Extraction quality eval (LLM-as-judge) | NEW ✅ | Task 13.5 — emergent після Task 13 |
 | Gold annotation (130 manually-labeled posts) | NEW ✅ | Task 12 — необхідна основа для evals |
-| Two-tier model strategy (Flash Lite for sourcing, Pro Preview for precision filter) | NEW (open question) 🚧 | Output Task 13.5 — see [`2026-04-26-gemini-pro-vs-lite-cost.md`](2026-04-26-gemini-pro-vs-lite-cost.md) |
+| Two-tier model strategy (Flash Lite for sourcing, Pro Preview for precision filter) | NEW (open question) 🚧 | Output Task 13.5 — see [`2026-04-26-gemini-pro-vs-lite-cost.md`](../extraction-quality-eval/2026-04-26-gemini-pro-vs-lite-cost.md) |
 | `src/sources/` module (TelegramCollector, NewsCollector) | 📋 still planned | Сирий збір живе в `scripts/collect_telegram_posts.py`; адаптери в `src/` чекають Task 21 |
 | `src/bot/` Telegram handlers | 📋 still planned | Без змін vs original — chat-frontend Phase 2 |
 | `src/ingestion/` orchestrator | 📋 still planned | Task 15 — наступний крок після Task 13.5 closeout |
@@ -464,10 +464,10 @@ Domain models (Pydantic, src/prophet_checker/models/domain.py):
 ## Cross-references
 
 - Original design (модулі + AWS topology): [`2026-04-07-prophet-checker-design.md`](2026-04-07-prophet-checker-design.md)
-- Master plan + task statuses: [`2026-04-08-prophet-checker-plan.md`](2026-04-08-prophet-checker-plan.md)
-- Annotation rubric: [`annotation-guidelines.md`](annotation-guidelines.md)
-- Extraction eval design: [`2026-04-21-extraction-quality-eval-design.md`](2026-04-21-extraction-quality-eval-design.md)
-- Extraction eval implementation plan: [`2026-04-21-extraction-quality-eval-plan.md`](2026-04-21-extraction-quality-eval-plan.md)
-- Cost comparison Flash Lite vs Pro Preview: [`2026-04-26-gemini-pro-vs-lite-cost.md`](2026-04-26-gemini-pro-vs-lite-cost.md)
-- Per-post extraction reports: [`2026-04-26-extraction-consolidated-report.md`](2026-04-26-extraction-consolidated-report.md)
-- Scripts layout & scenarios: [`../scripts/README.md`](../scripts/README.md)
+- Master plan + task statuses: [`2026-04-08-prophet-checker-plan.md`](../plan/2026-04-08-prophet-checker-plan.md)
+- Annotation rubric: [`annotation-guidelines.md`](../annotation/annotation-guidelines.md)
+- Extraction eval design: [`2026-04-21-extraction-quality-eval-design.md`](../extraction-quality-eval/2026-04-21-extraction-quality-eval-design.md)
+- Extraction eval implementation plan: [`2026-04-21-extraction-quality-eval-plan.md`](../extraction-quality-eval/2026-04-21-extraction-quality-eval-plan.md)
+- Cost comparison Flash Lite vs Pro Preview: [`2026-04-26-gemini-pro-vs-lite-cost.md`](../extraction-quality-eval/2026-04-26-gemini-pro-vs-lite-cost.md)
+- Per-post extraction reports: [`2026-04-26-extraction-consolidated-report.md`](../extraction-quality-eval/2026-04-26-extraction-consolidated-report.md)
+- Scripts layout & scenarios: [`../scripts/README.md`](../../scripts/README.md)

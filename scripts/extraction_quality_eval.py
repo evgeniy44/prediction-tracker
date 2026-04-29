@@ -2,7 +2,7 @@
 """Extraction Quality Evaluation — Task 13.5.
 
 LLM-as-judge eval for prediction extraction quality across 3 models.
-See spec: docs/2026-04-21-extraction-quality-eval-design.md
+See spec: docs/extraction-quality-eval/2026-04-21-extraction-quality-eval-design.md
 """
 from __future__ import annotations
 
