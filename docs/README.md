@@ -35,11 +35,20 @@ Master plan + status. Living documents.
 
 Smart Verifier з Dumb Trigger: 4-status output (confirmed/refuted/unresolved/premature), prediction_strength, max_horizon, retry-loop semantics. Розв'язує проблему target_date=null у 70-90% claims.
 
+### Spec + Plan
+
 | Документ | Призначення |
 |----------|-------------|
 | [`2026-04-26-verification-trigger-policy-design.md`](verifier-v2/2026-04-26-verification-trigger-policy-design.md) | Spec: full design + state machine + edge cases |
 | [`2026-04-29-verification-trigger-policy-plan.md`](verifier-v2/2026-04-29-verification-trigger-policy-plan.md) | Implementation plan — 9 TDD tasks, 58 steps, ~30 tests + empirical re-run |
-| [`2026-04-29-verifier-v2-data-flows.md`](verifier-v2/2026-04-29-verifier-v2-data-flows.md) | 5 ASCII diagrams: single call / lifecycle / trigger logic / full cycle / v1 vs v2 |
+
+### Data flow diagrams (Mermaid, by topic — кожен ~50-70 рядків)
+
+| Документ | Що показує |
+|----------|-----------|
+| [`2026-04-29-verifier-v2-call.md`](verifier-v2/2026-04-29-verifier-v2-call.md) | Single `verify_v2()` call — happy path + failure modes |
+| [`2026-04-29-prediction-lifecycle.md`](verifier-v2/2026-04-29-prediction-lifecycle.md) | State machine: Extracted → InFlight/Terminal → ForcedTerminal |
+| [`2026-04-29-verification-cycle.md`](verifier-v2/2026-04-29-verification-cycle.md) | Orchestrator cycle: housekeeping → fetch → verify loop |
 
 ## 📝 [`annotation/`](annotation/) — Task 12 manual gold labeling
 
