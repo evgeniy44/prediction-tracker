@@ -45,40 +45,32 @@ touch tests/sources/__init__.py
 Add to a NEW file `tests/sources/test_protocol.py`:
 
 ```python
-"""Tests that Source Protocol exists and structurally accepts conformant impls."""
 from datetime import datetime
-from typing import AsyncIterator, get_type_hints
+from typing import AsyncIterator
 
-from prophet_checker.models.domain import PersonSource, RawDocument, SourceType
+from prophet_checker.models.domain import PersonSource, RawDocument
 from prophet_checker.sources.base import Source
 
 
 def test_source_protocol_importable():
-    """Source Protocol can be imported."""
     assert Source is not None
 
 
 def test_source_protocol_has_collect_method():
-    """Protocol declares `collect` async method."""
     assert hasattr(Source, "collect")
 
 
 class _ConformantImpl:
-    """Minimal class that structurally satisfies Source."""
     async def collect(
         self,
         person_source: PersonSource,
         since: datetime | None = None,
     ) -> AsyncIterator[RawDocument]:
         if False:
-            yield  # makes function a generator
+            yield
 
 
 def test_source_protocol_structural_check():
-    """A class with matching `collect` signature is acceptable as Source.
-
-    Protocol uses structural subtyping — no inheritance needed.
-    """
     impl: Source = _ConformantImpl()
     assert impl is not None
 ```
@@ -94,12 +86,6 @@ Expected: 3 errors — `ModuleNotFoundError: No module named 'prophet_checker.so
 - [ ] **Step 4: Implement `Source` Protocol in `src/prophet_checker/sources/base.py`**
 
 ```python
-"""Source Protocol — pluggable adapter contract for raw-document collection.
-
-Implementations yield RawDocument objects. They do NOT persist —
-orchestrator decides what to do with each yielded doc (save to DB,
-write to file, dedupe, etc.).
-"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -114,17 +100,6 @@ class Source(Protocol):
         person_source: PersonSource,
         since: datetime | None = None,
     ) -> AsyncIterator[RawDocument]:
-        """Yield RawDocuments collected from external system.
-
-        Args:
-            person_source: configuration (channel name, person_id, source_type)
-            since: optional lower bound — yield only docs newer than this.
-                   None = collect from beginning (initial backfill).
-
-        Yields:
-            RawDocument: one per accepted item. Filter rules (length, type)
-                         applied internally per source.
-        """
         ...
 ```
 
@@ -156,7 +131,6 @@ git commit -m "feat(sources): add Source Protocol package (Task 21)"
 Create `tests/sources/test_telegram.py`:
 
 ```python
-"""TelegramSource unit tests with mocked Telethon client."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -168,10 +142,7 @@ from prophet_checker.models.domain import PersonSource, SourceType
 from prophet_checker.sources.telegram import TelegramSource
 
 
-# ── Test helpers ────────────────────────────────────────────────────
-
 def make_message(msg_id: int, text: str | None, date: datetime):
-    """Build a Telethon-like Message mock."""
     m = MagicMock()
     m.id = msg_id
     m.text = text
@@ -180,12 +151,6 @@ def make_message(msg_id: int, text: str | None, date: datetime):
 
 
 def make_mock_client(messages, get_entity_raises=None):
-    """Build a TelegramClient mock.
-
-    Args:
-        messages: list of Message-like mocks to yield from iter_messages
-        get_entity_raises: optional Exception class to raise from get_entity
-    """
     client = MagicMock()
     if get_entity_raises is not None:
         client.get_entity = AsyncMock(side_effect=get_entity_raises("test"))
@@ -213,17 +178,14 @@ def make_person_source(
     )
 
 
-# ── Tests ───────────────────────────────────────────────────────────
-
 @pytest.mark.asyncio
 async def test_collect_yields_filtered_documents():
-    """Short messages and media-only (no text) are filtered out."""
-    long_text = "А" * 100  # >= min_text_length=80
+    long_text = "А" * 100
     short_text = "shrt"
     msgs = [
         make_message(1, long_text, datetime(2024, 6, 1, tzinfo=UTC)),
         make_message(2, short_text, datetime(2024, 6, 2, tzinfo=UTC)),
-        make_message(3, None, datetime(2024, 6, 3, tzinfo=UTC)),  # media-only
+        make_message(3, None, datetime(2024, 6, 3, tzinfo=UTC)),
     ]
     client = make_mock_client(msgs)
     source = TelegramSource(client)
@@ -241,7 +203,6 @@ async def test_collect_yields_filtered_documents():
 
 @pytest.mark.asyncio
 async def test_collect_builds_telegram_url():
-    """URL format: https://t.me/<channel>/<msg_id>."""
     long_text = "А" * 100
     msgs = [make_message(42, long_text, datetime(2024, 6, 1, tzinfo=UTC))]
     client = make_mock_client(msgs)
@@ -257,7 +218,6 @@ async def test_collect_builds_telegram_url():
 
 @pytest.mark.asyncio
 async def test_collect_preserves_published_at():
-    """RawDocument.published_at = msg.date (preserved from Telegram)."""
     long_text = "А" * 100
     msg_date = datetime(2024, 7, 15, 12, 30, tzinfo=UTC)
     msgs = [make_message(1, long_text, msg_date)]
@@ -284,7 +244,6 @@ Expected: 3 errors — `ModuleNotFoundError`.
 Create `src/prophet_checker/sources/telegram.py`:
 
 ```python
-"""Telegram source adapter — collects posts from public channels via Telethon."""
 from __future__ import annotations
 
 import logging
@@ -302,12 +261,6 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramSource:
-    """Source adapter that reads public Telegram channels via Telethon.
-
-    Auth: requires pre-authenticated TelegramClient (session file already
-    exists). Does NOT do interactive auth — caller passes a started client.
-    """
-
     DEFAULT_MIN_TEXT_LENGTH = 80
 
     def __init__(
@@ -374,13 +327,11 @@ Append to `tests/sources/test_telegram.py`:
 ```python
 @pytest.mark.asyncio
 async def test_collect_respects_since_param():
-    """iter_messages goes newest-first; stop when message older than `since`."""
     long_text = "А" * 100
-    # iter_messages yields newest-first per Telethon convention
     msgs = [
-        make_message(3, long_text, datetime(2024, 8, 1, tzinfo=UTC)),  # after since
-        make_message(2, long_text, datetime(2024, 7, 1, tzinfo=UTC)),  # after since
-        make_message(1, long_text, datetime(2024, 5, 1, tzinfo=UTC)),  # before since → break
+        make_message(3, long_text, datetime(2024, 8, 1, tzinfo=UTC)),
+        make_message(2, long_text, datetime(2024, 7, 1, tzinfo=UTC)),
+        make_message(1, long_text, datetime(2024, 5, 1, tzinfo=UTC)),
     ]
     client = make_mock_client(msgs)
     source = TelegramSource(client)
@@ -397,11 +348,10 @@ async def test_collect_respects_since_param():
 
 @pytest.mark.asyncio
 async def test_collect_since_none_yields_all():
-    """since=None means initial backfill — no time filter."""
     long_text = "А" * 100
     msgs = [
         make_message(2, long_text, datetime(2024, 8, 1, tzinfo=UTC)),
-        make_message(1, long_text, datetime(2020, 1, 1, tzinfo=UTC)),  # very old, but no since
+        make_message(1, long_text, datetime(2020, 1, 1, tzinfo=UTC)),
     ]
     client = make_mock_client(msgs)
     source = TelegramSource(client)
@@ -427,8 +377,6 @@ In `src/prophet_checker/sources/telegram.py`, modify the `async for msg` loop:
 
 ```python
         async for msg in self._client.iter_messages(entity):
-            # Stop early when reaching messages older than `since` cutoff.
-            # iter_messages yields newest-first per Telethon convention.
             if since is not None and msg.date < since:
                 break
 
@@ -484,7 +432,6 @@ from telethon.errors import (
 
 @pytest.mark.asyncio
 async def test_collect_skips_non_telegram_source():
-    """PersonSource with source_type != TELEGRAM yields empty iterator."""
     msgs = [make_message(1, "А" * 100, datetime(2024, 6, 1, tzinfo=UTC))]
     client = make_mock_client(msgs)
     source = TelegramSource(client)
@@ -503,10 +450,9 @@ async def test_collect_skips_non_telegram_source():
     ChannelPrivateError,
     UsernameInvalidError,
     UsernameNotOccupiedError,
-    ValueError,  # Telethon raises ValueError for bad channel strings
+    ValueError,
 ])
 async def test_collect_handles_channel_access_error(error_class, caplog):
-    """Channel-access errors → empty iterator + warning log."""
     client = make_mock_client([], get_entity_raises=error_class)
     source = TelegramSource(client)
 
