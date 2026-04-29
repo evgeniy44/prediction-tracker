@@ -2,7 +2,7 @@
 
 **Дата:** 2026-04-26
 **Статус:** APPROVED — ready for implementation plan
-**Supersedes:** Verification flow section in [`2026-04-07-prophet-checker-design.md`](../architecture/2026-04-07-prophet-checker-design.md) і open question у [`2026-04-26-architecture-current.md`](../architecture/2026-04-26-architecture-current.md) (Flow 5b "OPEN QUESTION 1")
+**Supersedes:** open question у [`2026-04-26-architecture-current.md`](../architecture/2026-04-26-architecture-current.md) (Flow 5b "OPEN QUESTION 1")
 
 ---
 
@@ -495,6 +495,5 @@ Provide your verdict per the rubric.
 ## Cross-references
 
 - Architecture refresh: [`2026-04-26-architecture-current.md`](../architecture/2026-04-26-architecture-current.md)
-- Original design: [`2026-04-07-prophet-checker-design.md`](../architecture/2026-04-07-prophet-checker-design.md)
 - Empirical 10-claim test (v1 prompt): `scripts/outputs/extraction_eval/verifier_4status_test.json`
 - Master plan: [`2026-04-08-prophet-checker-plan.md`](../plan/2026-04-08-prophet-checker-plan.md)

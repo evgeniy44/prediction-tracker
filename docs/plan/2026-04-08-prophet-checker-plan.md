@@ -10,7 +10,7 @@
 
 **Tech Stack:** Python 3.11+, FastAPI, SQLAlchemy 2.0, pgvector, LiteLLM, aiogram, Docker, PostgreSQL, AWS (EC2 + RDS)
 
-**Spec:** `docs/superpowers/specs/2026-04-07-prophet-checker-design.md`
+**Spec:** see [`../architecture/2026-04-26-architecture-current.md`](../architecture/2026-04-26-architecture-current.md) (original design from 2026-04-07 superseded and deleted on 2026-04-29)
 
 **Repo:** `github.com/evgeniy44/prediction-tracker` (public)
 

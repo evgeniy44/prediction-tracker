@@ -14,7 +14,7 @@ Tracking time, cost, and deliverables for each phase of the project.
 | Step | Deliverable |
 |------|------------|
 | Brainstorm | Ідея, вибір tech stack, архітектурні рішення (12 питань-відповідей) |
-| Design spec | `docs/superpowers/specs/2026-04-07-prophet-checker-design.md` |
+| Design spec (DELETED 2026-04-29 — see architecture-current.md) | `docs/superpowers/specs/2026-04-07-prophet-checker-design.md` |
 | Architecture doc | `docs/prophet-checker-architecture.md` |
 | Implementation plan | `docs/superpowers/plans/2026-04-08-prophet-checker-plan.md` (19 задач, 5 milestones) |
 | Todoist project | 19 задач + ~90 підзадач + 6 content задач |

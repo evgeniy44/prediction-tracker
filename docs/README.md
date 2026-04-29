@@ -13,12 +13,25 @@ Master plan + status. Living documents.
 
 ## 🏛 [`architecture/`](architecture/) — architectural specs
 
-Що ми будуємо і чому.
+Що ми будуємо і чому. Index + 7 окремих data flow docs (по аналогії з verifier-v2/).
+
+### Index
 
 | Документ | Призначення |
 |----------|-------------|
-| [`2026-04-07-prophet-checker-design.md`](architecture/2026-04-07-prophet-checker-design.md) | Original design — модулі, схема БД, AWS topology. Historical reference. |
-| [`2026-04-26-architecture-current.md`](architecture/2026-04-26-architecture-current.md) | **Current state with focus on data flows.** 5 active pipelines + module inventory + open questions. Living document. |
+| [`2026-04-26-architecture-current.md`](architecture/2026-04-26-architecture-current.md) | **Index** — module inventory, table-of-contents 7 flows, shared components, what's next |
+
+### Active data flows (Mermaid діаграми, кожен ~50-100 рядків)
+
+| Документ | Status | Що показує |
+|----------|--------|-----------|
+| [`flow-1-telegram-collection.md`](architecture/2026-04-26-flow-1-telegram-collection.md) | ✅ implemented | Telethon → JSON-дамп |
+| [`flow-2-gold-annotation.md`](architecture/2026-04-26-flow-2-gold-annotation.md) | ✅ implemented | Manual YES/NO розмітка → gold_labels.json |
+| [`flow-3-detection-eval.md`](architecture/2026-04-26-flow-3-detection-eval.md) | ✅ Task 13 done | 5 моделей × 2 prompt → P/R/F1 матриця |
+| [`flow-4-extraction-quality-eval.md`](architecture/2026-04-26-flow-4-extraction-quality-eval.md) | ✅ Task 13.5 done | 3-stage LLM-as-judge eval |
+| [`idle-components.md`](architecture/2026-04-26-idle-components.md) | 🚧 built, not orchestrated | Class inventory of `src/` |
+| [`flow-production-ingestion.md`](architecture/2026-04-26-flow-production-ingestion.md) | 📋 Task 15 | Scheduler → collect → detect → extract → save |
+| [`flow-production-rag.md`](architecture/2026-04-26-flow-production-rag.md) | 📋 bot module | User query → embed → search → LLM answer |
 
 ## 🔬 [`extraction-quality-eval/`](extraction-quality-eval/) — Task 13.5
 
