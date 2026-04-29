@@ -4,8 +4,7 @@
 **Доповнює:** [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md) (the spec)
 **Статус:** Reference visualization — for understanding, not implementation gate
 
-Цей документ — це **5 візуалізацій** Verifier v2 на різних рівнях деталізації.
-Спершу читай spec для контексту; візуалізації нижче — для швидкого огляду «як воно тече».
+5 візуалізацій Verifier v2 у форматі Mermaid (рендериться у GitHub, GitLab, Obsidian out-of-the-box). Спершу читай spec для контексту; ці діаграми — для швидкого огляду «як воно тече».
 
 ---
 
@@ -13,121 +12,56 @@
 
 Що відбувається у момент виклику verifier'а на ОДНУ prediction.
 
-```
-                  Caller (orchestrator або scheduler)
-                              │
-                              │ verify_v2(prediction, today, post_excerpt)
-                              ▼
-            ┌───────────────────────────────────────┐
-            │ PredictionVerifier.verify_v2()        │
-            │  src/prophet_checker/analysis/        │
-            │     verifier.py                       │
-            └────────────┬──────────────────────────┘
-                         │
-                         │ verify_attempts += 1  (always, even on failure)
-                         │
-                         ▼
-            ┌───────────────────────────────────────┐
-            │ build_verification_prompt_v2()        │
-            │  inputs: claim_text, prediction_date, │
-            │          target_date, post_excerpt,   │
-            │          today                        │
-            └────────────┬──────────────────────────┘
-                         │
-                         │ user-message text
-                         ▼
-            ┌───────────────────────────────────────┐
-            │ get_verification_system_v2(today)     │
-            │  returns SYSTEM prompt with {today}   │
-            │  injected, 4-status rubric,           │
-            │  strength rubric, mutual-exclusion    │
-            └────────────┬──────────────────────────┘
-                         │
-                         │ system-message text
-                         ▼
-            ┌───────────────────────────────────────┐
-            │ self._llm.complete(prompt, system)    │
-            │  LiteLLM → Anthropic Opus 4.6         │
-            │  (or any other provider)              │
-            └────────────┬──────────────────────────┘
-                         │
-            ┌────────────┴────────────┐
-            │                         │
-            ▼                         ▼
-        SUCCESS                   FAILURE
-        raw text                  Exception
-            │                         │
-            ▼                         │
-   ┌────────────────────┐             │
-   │ parse_verification │             │
-   │ _response_v2(raw)  │             │
-   │  - strip fence     │             │
-   │  - find first {    │             │
-   │  - raw_decode      │             │
-   │  - validate enums  │             │
-   │  - apply mutual-   │             │
-   │    exclusion rules │             │
-   └─────────┬──────────┘             │
-             │                        │
-   ┌─────────┴─────────┐              │
-   │                   │              │
-   ▼                   ▼              │
- OK result        invalid /           │
-                  parse error         │
-   │                   │              │
-   │                   └──────────────┤
-   │                                  │
-   ▼                                  ▼
-                                 Return prediction
-                                 unchanged (only
-                                 verify_attempts++)
-                                 verified_at stays NULL
-                                 — no LLM cost wasted
-                                 on retry, but next
-                                 cycle will try again
-   │
-   │ result = VerificationResult(status, confidence,
-   │   prediction_strength, reasoning, evidence,
-   │   retry_after, max_horizon, verdict_invalid)
-   ▼
-┌──────────────────────────────────────────────┐
-│ Apply set-once metadata                      │
-│                                              │
-│  if prediction.prediction_strength is None:  │
-│      prediction.prediction_strength =        │
-│          PredictionStrength(result.strength) │
-│                                              │
-│  if prediction.max_horizon is None and       │
-│     result.max_horizon is not None:          │
-│      prediction.max_horizon =                │
-│          result.max_horizon                  │
-└─────────────────┬────────────────────────────┘
-                  │
-       ┌──────────┴───────────┐
-       │                      │
-       ▼                      ▼
-  result.status         result.status
-  == "premature"        in (confirmed/refuted/unresolved)
-       │                      │
-       ▼                      ▼
-┌─────────────────┐   ┌─────────────────────────────┐
-│ IN-FLIGHT       │   │ TERMINAL                    │
-│                 │   │                             │
-│ next_check_at = │   │ status = result.status      │
-│ result.         │   │ confidence = result.        │
-│   retry_after   │   │   confidence                │
-│                 │   │ evidence_text = result.     │
-│ verified_at     │   │   evidence                  │
-│   stays NULL    │   │ verified_at = today         │
-│                 │   │ next_check_at = NULL        │
-│ status = stays  │   │                             │
-│   UNRESOLVED    │   │                             │
-└────────┬────────┘   └──────────┬──────────────────┘
-         │                       │
-         └───────────┬───────────┘
-                     │
-                     ▼
-          return prediction (mutated)
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Caller (orchestrator)
+    participant V as PredictionVerifier
+    participant P as build_prompt_v2
+    participant L as LLMClient (Opus)
+    participant R as parse_response_v2
+    participant DB as Prediction state
+
+    C->>V: verify_v2(prediction, today, post_excerpt)
+    V->>DB: verify_attempts += 1
+    V->>P: build user + system prompts
+    P-->>V: (user, system) text
+    V->>L: complete(prompt, system)
+
+    alt LLM success
+        L-->>V: raw JSON response
+        V->>R: parse_verification_response_v2(raw)
+
+        alt Parse OK and not invalid
+            R-->>V: VerificationResult
+
+            opt prediction_strength is None
+                V->>DB: set prediction_strength (set-once)
+            end
+            opt max_horizon is None and result has it
+                V->>DB: set max_horizon (set-once)
+            end
+
+            alt status == "premature"
+                V->>DB: next_check_at = result.retry_after
+                Note over DB: stays in queue<br/>verified_at = NULL
+            else status terminal (C/R/U)
+                V->>DB: status, confidence, evidence
+                V->>DB: verified_at = today
+                V->>DB: next_check_at = NULL
+            end
+
+        else Parse fail or verdict_invalid
+            R-->>V: None / invalid
+            Note over V,DB: only verify_attempts++ persists
+        end
+
+    else LLM exception
+        L-->>V: Exception (logged)
+        Note over V,DB: only verify_attempts++ persists
+    end
+
+    V-->>C: prediction (mutated)
 ```
 
 **Інваріанти, які тримаються:**
@@ -140,155 +74,86 @@
 
 ## 2. Lifecycle of a Prediction — multiple verifications over time
 
-Що відбувається з ОДНОЮ prediction між моментом її створення (extraction) і terminal verdict.
+Стани, через які проходить ОДНА prediction від моменту створення (extraction) до terminal verdict.
 
-```
-T₀ — extraction (Task 15 future orchestrator buduje prediction)
-═════════════════════════════════════════════════════════════
-{
-  status:             UNRESOLVED  (default initial)
-  verified_at:        NULL
-  next_check_at:      NULL
-  prediction_strength: NULL  (will be set on first verify)
-  max_horizon:        NULL  (will be set if applicable)
-  verify_attempts:    0
-}
+```mermaid
+stateDiagram-v2
+    [*] --> Extracted: Task 15 orchestrator<br/>creates Prediction
 
-      │
-      │ scheduler-cycle picks it up:
-      │   get_eligible_for_verification(today=T₁) → [pred]
-      │   (eligible because verified_at IS NULL,
-      │    next_check_at IS NULL, max_horizon IS NULL)
-      │
-      ▼
+    Extracted --> InFlight: verify_v2 → "premature"<br/>(set strength + max_horizon<br/>+ next_check_at)
+    Extracted --> Terminal: verify_v2 → C/R/U<br/>(set strength + verified_at)
 
-T₁ — first verification call
-═════════════════════════════════════════════════════════════
-verifier.verify_v2(pred, today=T₁)
-   LLM returns:
-     status = "premature"
-     prediction_strength = "medium"
-     retry_after = T₁ + 6 months
-     max_horizon = T₁ + 5 years
-     reasoning = "vague forward statement, give it time"
+    InFlight --> InFlight: next_check_at ≤ today<br/>still "premature"<br/>(set-once fields preserved)
+    InFlight --> Terminal: verifier finds evidence<br/>OR confirms ambiguity
+    InFlight --> ForcedTerminal: max_horizon < today<br/>(force_unresolved_past_horizon)
 
-After call:
-{
-  status:             UNRESOLVED  (unchanged — premature)
-  verified_at:        NULL  (still in queue)
-  next_check_at:      T₁ + 6m  (set!)
-  prediction_strength: "medium"  (set once!)
-  max_horizon:        T₁ + 5y  (set once!)
-  verify_attempts:    1
-}
+    Terminal --> [*]: persisted final
+    ForcedTerminal --> [*]: persisted as<br/>UNRESOLVED + evidence=<br/>"exceeded max_horizon"
 
-      │
-      │ time passes — between T₁+1d and T₁+6m,
-      │   prediction is INVISIBLE to scheduler
-      │   (next_check_at > today excludes it)
-      │
-      ▼
+    note right of Extracted
+        status=UNRESOLVED (default)
+        verified_at=NULL
+        next_check_at=NULL
+        prediction_strength=NULL
+        max_horizon=NULL
+        verify_attempts=0
+    end note
 
-T₂ = T₁ + 6m — second verification call
-═════════════════════════════════════════════════════════════
-   get_eligible(today=T₂) → [pred]
-     (next_check_at == T₂ ≤ today, max_horizon > today)
+    note right of InFlight
+        status=UNRESOLVED (unchanged)
+        verified_at=NULL
+        next_check_at=YYYY-MM-DD
+        prediction_strength=set (e.g. "medium")
+        max_horizon=set or NULL
+        verify_attempts=N
+    end note
 
-verifier.verify_v2(pred, today=T₂)
-   LLM still finds no concrete evidence:
-     status = "premature"
-     retry_after = T₂ + 1 year
-     prediction_strength = "medium"  (verifier returns it but is IGNORED — set-once)
-     max_horizon = ...                (also IGNORED — set-once)
-
-After call:
-{
-  next_check_at:      T₂ + 1y
-  verify_attempts:    2
-  // strength + max_horizon UNCHANGED (set-once)
-}
-
-      │
-      │ continue looping...
-      │
-      ▼
-
-T_n — eventually one of two things happens
-═════════════════════════════════════════════════════════════
-  (a) LLM finds evidence → terminal
-        verifier returns status=confirmed/refuted/unresolved
-        verified_at = T_n  ←  PREDICTION FINALIZED
-        next_check_at = NULL
-
-  (b) max_horizon < today_n, still no evidence
-        scheduler runs force_unresolved_past_horizon(T_n)
-        → bulk-update:
-            status = UNRESOLVED
-            verified_at = T_n
-            evidence_text = "exceeded max_horizon"
-        ←  PREDICTION FINALIZED (timeout fallback)
+    note right of Terminal
+        status=confirmed/refuted/unresolved
+        verified_at=today
+        next_check_at=NULL
+        evidence_text=concrete fact
+        prediction_strength=set
+    end note
 ```
 
 **Cost-per-prediction (envelope estimate):**
 
-- LLM-cheap path: 1 verify call → terminal. Cost ≈ 1 × Opus call.
+- Cheap path: 1 verify call → terminal. Cost ≈ 1 × Opus call.
 - Worst case: ~10 verifies (vague open-ended) → terminal або timeout. Cost ≈ 10 × Opus calls.
-- Бюджетна оцінка: 1000 predictions × avg 2.5 verifies = 2500 Opus calls × ~3k tokens × $5/M input + $25/M output ≈ $40 на 1000 predictions on Opus.
+- Бюджетна оцінка: 1000 predictions × avg 2.5 verifies = 2500 Opus calls × ~3k tokens × ($5 / 1M input + $25 / 1M output) ≈ $40 на 1000 predictions on Opus.
 
 ---
 
 ## 3. Trigger logic — `get_eligible_for_verification(today, limit)`
 
-Який саме SQL-фільтр застосовується кожний cycle.
+Який саме фільтр SQL застосовується кожний cycle.
 
+```mermaid
+flowchart TD
+    Start([predictions table]) --> F1{verified_at<br/>IS NULL?}
+    F1 -- No --> Skip1[❌ Already terminal<br/>skip]
+    F1 -- Yes --> F2{next_check_at IS NULL<br/>OR &lt;= today?}
+    F2 -- No --> Skip2[❌ Too early<br/>skip until next_check_at]
+    F2 -- Yes --> F3{max_horizon IS NULL<br/>OR &gt;= today?}
+    F3 -- No --> Skip3[⚠️ Expired<br/>handled by<br/>force_unresolved_past_horizon<br/>not eligible queue]
+    F3 -- Yes --> Eligible([✅ ELIGIBLE<br/>included in batch])
+
+    style Skip1 fill:#ffe6e6
+    style Skip2 fill:#fff4e6
+    style Skip3 fill:#fff4e6
+    style Eligible fill:#e6ffe6
 ```
-                ┌──────────────────────────────────────────┐
-                │ predictions table (PostgresPredictionDB) │
-                │                                          │
-                │  ┌────────┬───────┬────────┬───────────┐ │
-                │  │ id     │status │verified│ next_     │ │
-                │  │        │       │_at     │ check_at  │ │
-                │  ├────────┼───────┼────────┼───────────┤ │
-                │  │ p1     │UNRES  │ NULL   │ NULL      │ │  ←  fresh extracted
-                │  │ p2     │UNRES  │ NULL   │ 2027-01   │ │  ←  in-flight, not yet ready
-                │  │ p3     │UNRES  │ NULL   │ 2026-04   │ │  ←  in-flight, ready
-                │  │ p4     │CONFIRM│2025-08 │ NULL      │ │  ←  terminal
-                │  │ p5     │UNRES  │ NULL   │ NULL      │ │  ┐ also has
-                │  │        │       │        │           │ │ │ max_horizon=
-                │  │        │       │        │           │ │ │ 2025-12 — expired
-                │  └────────┴───────┴────────┴───────────┘ │
-                └──────────────────┬───────────────────────┘
-                                   │
-                                   │ today = 2026-04-29
-                                   │
-                                   ▼
-        ┌─────────────────────────────────────────────────────┐
-        │ get_eligible_for_verification(today=2026-04-29)     │
-        │                                                     │
-        │ SQL filter:                                         │
-        │   WHERE verified_at IS NULL                         │
-        │     AND (next_check_at IS NULL                      │
-        │          OR next_check_at <= today)                 │
-        │     AND (max_horizon IS NULL                        │
-        │          OR max_horizon >= today)                   │
-        │   LIMIT {batch_size}                                │
-        └────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-                     ┌───────────────────┐
-                     │ Eligible: [p1,p3] │
-                     │                   │
-                     │ ❌ p2: next_check │
-                     │   _at > today     │
-                     │ ❌ p4: verified   │
-                     │ ❌ p5: max_horiz  │
-                     │   exceeded —      │
-                     │   handled by      │
-                     │   force_unresolv  │
-                     │   ed_past_horizon │
-                     │   instead         │
-                     └───────────────────┘
-```
+
+**Приклад того як фільтр застосовується до 5 різних predictions** (today = 2026-04-29):
+
+| id | status | verified_at | next_check_at | max_horizon | Verdict |
+|----|--------|-------------|---------------|-------------|---------|
+| p1 | UNRES | NULL | NULL | NULL | ✅ eligible (fresh extracted) |
+| p2 | UNRES | NULL | 2027-01-01 | NULL | ❌ next_check_at > today |
+| p3 | UNRES | NULL | 2026-04-01 | NULL | ✅ eligible (next_check_at passed) |
+| p4 | CONFIRM | 2025-08-15 | NULL | NULL | ❌ already terminal |
+| p5 | UNRES | NULL | NULL | 2025-12-31 | ⚠️ horizon exceeded — handled by housekeeping |
 
 **Index used:** `idx_predictions_eligible(verified_at, next_check_at, max_horizon)`. Composite index ensures O(log N) filter навіть при мільйоні rows.
 
@@ -298,92 +163,45 @@ T_n — eventually one of two things happens
 
 Один запуск scheduler-cycle (Task 15 буде це викликати).
 
-```
-        ┌──────────────────┐
-        │  Trigger Source  │
-        │                  │
-        │  cron / FastAPI  │
-        │  endpoint /      │
-        │  manual call     │
-        └────────┬─────────┘
-                 │
-                 │ verification_cycle(today)
-                 ▼
-   ┌──────────────────────────────────────────────────────┐
-   │                                                       │
-   │  Step 1: HOUSEKEEPING                                 │
-   │  ────────────────────────                             │
-   │  n_finalized = pred_repo.                             │
-   │      force_unresolved_past_horizon(today)             │
-   │                                                       │
-   │  ┌────────────────────────────────────────────┐       │
-   │  │ UPDATE predictions                          │       │
-   │  │ SET status='unresolved', verified_at=today, │       │
-   │  │     evidence_text='exceeded max_horizon'    │       │
-   │  │ WHERE verified_at IS NULL                   │       │
-   │  │   AND max_horizon IS NOT NULL               │       │
-   │  │   AND max_horizon < today                   │       │
-   │  └────────────────────────────────────────────┘       │
-   │                                                       │
-   │  → Returns count of finalized rows (telemetry)        │
-   │                                                       │
-   └──────────────────────────┬────────────────────────────┘
-                              │
-                              ▼
-   ┌──────────────────────────────────────────────────────┐
-   │                                                       │
-   │  Step 2: FETCH BATCH                                  │
-   │  ────────────────                                     │
-   │  eligible = pred_repo.                                │
-   │      get_eligible_for_verification(today, limit=100)  │
-   │                                                       │
-   │  ┌────────────────────────────────────────────┐       │
-   │  │ SELECT * FROM predictions                    │       │
-   │  │ WHERE verified_at IS NULL                    │       │
-   │  │   AND (next_check_at IS NULL OR ...)         │       │
-   │  │   AND (max_horizon IS NULL OR ...)           │       │
-   │  │ LIMIT 100                                    │       │
-   │  └────────────────────────────────────────────┘       │
-   │                                                       │
-   │  → list[Prediction]  (up to 100)                      │
-   │                                                       │
-   └──────────────────────────┬────────────────────────────┘
-                              │
-                              │ for pred in eligible:
-                              │
-                              ▼
-   ┌──────────────────────────────────────────────────────┐
-   │                                                       │
-   │  Step 3: VERIFY EACH (in series, rate-limited)        │
-   │  ────────────────────────────────                     │
-   │                                                       │
-   │  for pred in eligible:                                │
-   │     post_excerpt = doc_repo.get(pred.document_id)     │
-   │                          .raw_text[:500]              │
-   │                                                       │
-   │     pred = await verifier.verify_v2(                  │
-   │         pred, today=today, post_excerpt=excerpt       │
-   │     )                                                 │
-   │     # ↑ this mutates pred — see Diagram 1             │
-   │                                                       │
-   │     await pred_repo.update(pred)                      │
-   │     # ↑ writes mutated state back                     │
-   │                                                       │
-   │     await asyncio.sleep(min_interval)                 │
-   │     # ↑ rate-limit per Anthropic 30k ITPM             │
-   │                                                       │
-   └──────────────────────────┬────────────────────────────┘
-                              │
-                              ▼
-                   ┌─────────────────────┐
-                   │ cycle complete      │
-                   │ telemetry:          │
-                   │   - n_finalized     │
-                   │   - n_processed     │
-                   │   - n_terminal      │
-                   │   - n_premature     │
-                   │   - n_errors        │
-                   └─────────────────────┘
+```mermaid
+sequenceDiagram
+    autonumber
+    participant T as Trigger (cron/FastAPI/CLI)
+    participant O as Orchestrator
+    participant R as PredictionRepo
+    participant DR as DocumentRepo
+    participant V as PredictionVerifier
+    participant L as LLM (Opus)
+    participant DB as Postgres
+
+    T->>O: verification_cycle(today)
+
+    Note over O,R: Step 1: Housekeeping (before any LLM call)
+    O->>R: force_unresolved_past_horizon(today)
+    R->>DB: UPDATE predictions<br/>SET status='unresolved', verified_at=today,<br/>evidence='exceeded max_horizon'<br/>WHERE max_horizon < today AND verified_at IS NULL
+    DB-->>R: n_updated rows
+    R-->>O: n_finalized (telemetry)
+
+    Note over O,R: Step 2: Fetch batch
+    O->>R: get_eligible_for_verification(today, limit=100)
+    R->>DB: SELECT * FROM predictions<br/>WHERE verified_at IS NULL<br/>AND (next_check_at IS NULL OR <= today)<br/>AND (max_horizon IS NULL OR >= today)<br/>LIMIT 100
+    DB-->>R: rows
+    R-->>O: list[Prediction]
+
+    Note over O,V: Step 3: Verify each (rate-limited)
+    loop for each pred in eligible
+        O->>DR: get_document_by_id(pred.document_id)
+        DR-->>O: doc.raw_text
+        O->>V: verify_v2(pred, today, post_excerpt=raw_text[:500])
+        V->>L: complete(prompt, system)
+        L-->>V: raw JSON response
+        V-->>O: pred (mutated, see Diagram 1)
+        O->>R: update(pred)
+        R->>DB: UPDATE predictions SET ... WHERE id = ?
+        Note over O: asyncio.sleep(min_interval)<br/>per Anthropic 30k ITPM
+    end
+
+    O-->>T: cycle telemetry<br/>{n_finalized, n_processed,<br/>n_terminal, n_premature, n_errors}
 ```
 
 **Чому Step 1 ВПЕРЕД, не паралельно з Step 2:**
@@ -393,96 +211,46 @@ T_n — eventually one of two things happens
 
 ## 5. v1 vs v2 — what changed
 
+### Old verifier (v1) — single-shot, 4-field output
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant V as PredictionVerifier (v1)
+    participant L as LLM
+    participant DB as Prediction
+
+    C->>V: verify(prediction)
+    Note right of V: NO `today` param<br/>NO post_excerpt
+    V->>L: complete(prompt, system)
+    L-->>V: 4-field JSON<br/>(status, confidence,<br/>evidence_url, evidence_text)
+    V->>DB: ALWAYS terminal<br/>status set<br/>verified_at = NOW
+    V-->>C: prediction (verified)
+    Note over V,DB: No retry semantics —<br/>premature → unresolved (lossy)
 ```
-                   ┌─────────────────────┐
-                   │  Verifier v1 (old)  │
-                   └──────────┬──────────┘
-                              │
-                              ▼
-              ┌───────────────────────────────┐
-              │ Input: prediction              │
-              │  (no `today` param)            │
-              │  (no post_excerpt)             │
-              └────────────┬───────────────────┘
-                           │
-                           ▼
-              ┌───────────────────────────────┐
-              │ LLM call → 4-field response:   │
-              │  • status: confirmed | refuted │
-              │            | unresolved        │
-              │  • confidence                  │
-              │  • evidence_url                │
-              │  • evidence_text               │
-              └────────────┬───────────────────┘
-                           │
-                           ▼
-              ┌───────────────────────────────┐
-              │ ALWAYS terminal:               │
-              │  • status set                  │
-              │  • verified_at = NOW           │
-              │  No retry semantics — every    │
-              │  prediction gets a verdict     │
-              │  immediately, even premature   │
-              │  ones (which gives shitty      │
-              │  unresolved).                  │
-              └───────────────────────────────┘
 
+### New verifier (v2) — supports retry-loop, 7-field output
 
-                   ┌─────────────────────┐
-                   │ Verifier v2 (new)   │
-                   └──────────┬──────────┘
-                              │
-                              ▼
-              ┌───────────────────────────────┐
-              │ Input: prediction, today,      │
-              │        post_excerpt            │
-              │  (today: critical for retry/   │
-              │   horizon math)                │
-              │  (post_excerpt: helps with     │
-              │   conditional and context)     │
-              └────────────┬───────────────────┘
-                           │
-                           ▼
-              ┌───────────────────────────────┐
-              │ LLM call → 7-field response:   │
-              │  • status: confirmed | refuted │
-              │            | unresolved        │
-              │            | premature ★ NEW   │
-              │  • confidence                  │
-              │  • prediction_strength: low    │
-              │            | medium | high ★   │
-              │  • reasoning                   │
-              │  • evidence (combined,         │
-              │       URL or fact)             │
-              │  • retry_after ★ NEW           │
-              │  • max_horizon ★ NEW           │
-              └────────────┬───────────────────┘
-                           │
-                           ▼
-              ┌───────────────────────────────┐
-              │ Two paths:                     │
-              │                                │
-              │ TERMINAL (3 statuses):         │
-              │   • status set                 │
-              │   • verified_at = today        │
-              │   • next_check_at = NULL       │
-              │                                │
-              │ IN-FLIGHT (premature):         │
-              │   • status stays UNRESOLVED    │
-              │   • verified_at = NULL         │
-              │   • next_check_at = retry_     │
-              │     after                      │
-              │   • returns to queue           │
-              │                                │
-              │ Set-once (regardless of path): │
-              │   • prediction_strength        │
-              │     (if not already set)       │
-              │   • max_horizon                │
-              │     (if not already set)       │
-              │                                │
-              │ Always:                        │
-              │   • verify_attempts += 1       │
-              └───────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant V as PredictionVerifier (v2)
+    participant L as LLM
+    participant DB as Prediction
+
+    C->>V: verify_v2(prediction, today, post_excerpt)
+    Note right of V: today injected<br/>post_excerpt for context
+    V->>L: complete(v2_prompt, v2_system)
+    L-->>V: 7-field JSON<br/>(status: C/R/U/premature,<br/>confidence,<br/>prediction_strength,<br/>reasoning, evidence,<br/>retry_after, max_horizon)
+
+    alt status == "premature"
+        V->>DB: next_check_at = retry_after<br/>set strength + max_horizon (once)
+        Note over V,DB: stays in queue
+    else terminal (C/R/U)
+        V->>DB: verified_at = today<br/>set strength (once)
+    end
+
+    V-->>C: prediction (mutated)
 ```
 
 ### Що додалось у v2
@@ -503,5 +271,5 @@ T_n — eventually one of two things happens
 
 - Spec: [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md)
 - Implementation plan: [`2026-04-29-verification-trigger-policy-plan.md`](2026-04-29-verification-trigger-policy-plan.md)
-- Architecture refresh (where Flow 5b lives): [`2026-04-26-architecture-current.md`](../architecture/2026-04-26-architecture-current.md)
+- Architecture refresh (where Flow 5b lives): [`../architecture/2026-04-26-architecture-current.md`](../architecture/2026-04-26-architecture-current.md)
 - v1 empirical baseline: `scripts/outputs/extraction_eval/verifier_4status_test.json`
