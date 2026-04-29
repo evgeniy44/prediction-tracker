@@ -44,6 +44,12 @@ Task 21 — рефактор у `src/prophet_checker/sources/telegram.py` з **`
 - Тестується кожна частина окремо
 - Source can be reused для one-off CLI bulk-збору без DB
 
+**Чому Source НЕ catch'ить exceptions (propagate everything):**
+- Source знає **що** трапилось (типи Telethon-винятків — `ChannelPrivateError`, `FloodWaitError`, etc.). Source НЕ знає **що з цим робити** — це політика циклу.
+- Якщо Source swallow'є permission error і повертає empty iter → orchestrator не може розрізнити "no new data since `since`" від "channel inaccessible". Config drift hide-иться, alerting не спрацьовує.
+- Source — pure adapter. Усі decision points (retry / disable PersonSource / alert / abort cycle) — на Orchestrator (Task 15), де є контекст cycle telemetry і per-source state.
+- Винятково: **structural skip** для `source_type != TELEGRAM` — це не error, а раннє повернення «не наша справа». Empty iter тут = "I'm not the right adapter for this".
+
 **Empirical justification:** скрипт вже працював end-to-end (5572 Arestovich posts), тому design — суто refactor існуючої логіки в правильні модулі.
 
 ---
@@ -129,15 +135,11 @@ class Source(Protocol):
 `src/prophet_checker/sources/telegram.py`:
 
 ```python
-from datetime import datetime, UTC
+from datetime import datetime
 from typing import AsyncIterator
 from uuid import uuid4
 
 from telethon import TelegramClient
-from telethon.errors import (
-    ChannelInvalidError, ChannelPrivateError,
-    UsernameInvalidError, UsernameNotOccupiedError,
-)
 
 from prophet_checker.models.domain import (
     PersonSource, RawDocument, SourceType,
@@ -145,13 +147,6 @@ from prophet_checker.models.domain import (
 
 
 class TelegramSource:
-    """Source adapter that reads public Telegram channels via Telethon.
-
-    Auth: requires pre-authenticated TelegramClient (session file already
-    exists). Does NOT do interactive auth — caller is responsible for
-    passing a started client.
-    """
-
     DEFAULT_MIN_TEXT_LENGTH = 80
 
     def __init__(
@@ -168,25 +163,15 @@ class TelegramSource:
         since: datetime | None = None,
     ) -> AsyncIterator[RawDocument]:
         if person_source.source_type != SourceType.TELEGRAM:
-            return  # not our source — empty iterator
-
-        channel = person_source.source_identifier
-
-        try:
-            entity = await self._client.get_entity(channel)
-        except (
-            ChannelInvalidError, ChannelPrivateError,
-            UsernameInvalidError, UsernameNotOccupiedError, ValueError,
-        ) as e:
-            logger.warning("Cannot access @%s: %s", channel, e)
             return
 
+        channel = person_source.source_identifier
+        entity = await self._client.get_entity(channel)
+
         async for msg in self._client.iter_messages(entity):
-            # Stop when reaching messages older than `since`
-            if since and msg.date < since:
+            if since is not None and msg.date < since:
                 break
 
-            # Filter: skip empty / too-short / media-only posts
             if not msg.text or len(msg.text.strip()) < self._min_text_length:
                 continue
 
@@ -197,10 +182,11 @@ class TelegramSource:
                 url=f"https://t.me/{channel}/{msg.id}",
                 published_at=msg.date,
                 raw_text=msg.text.strip(),
-                language="uk",  # default; detection deferred
-                # collected_at populated by Pydantic model_post_init
+                language="uk",
             )
 ```
+
+**Усі винятки з `get_entity()` і `iter_messages()` propagate'яться.** Orchestrator (Task 15) catch'ить per-source та класифікує: `ChannelPrivateError` etc. → disable PersonSource після N consecutive fails; `FloodWaitError` etc. → log + continue cycle.
 
 ---
 
@@ -287,8 +273,8 @@ await client.disconnect()
 |------|----------|
 | `test_collect_yields_filtered_documents` | Mock client returns 3 messages: short text, valid text, media-only. Source yields ONLY 1 (valid). |
 | `test_collect_respects_since_param` | Mock returns mix of pre/post `since` dates. Source stops at boundary. |
-| `test_collect_skips_non_telegram_source` | PersonSource with `source_type=NEWS` → empty iterator. |
-| `test_collect_handles_channel_access_error` | Mock raises `ChannelPrivateError` on `get_entity()` → empty iterator + warning logged. |
+| `test_collect_skips_non_telegram_source` | PersonSource with `source_type=NEWS` → empty iterator (structural skip, no error). |
+| `test_collect_propagates_channel_access_error` | Parametrized × 5: `Channel{Invalid,Private}Error`, `Username{Invalid,NotOccupied}Error`, `ValueError` — Source raises (not catch). |
 | `test_collect_builds_correct_url` | Verified `https://t.me/<channel>/<msg_id>` format. |
 
 **Mock pattern (Telethon):**
@@ -337,14 +323,18 @@ def make_mock_client(messages: list[Mock]) -> MagicMock:
 
 | Scenario | Behavior |
 |----------|----------|
-| Channel doesn't exist | `ChannelInvalidError` / `UsernameNotOccupiedError` → empty iterator + warn-log |
-| Channel is private | `ChannelPrivateError` → empty iterator + warn-log |
-| Network failure mid-collection | telethon raises → propagates to orchestrator (lets it decide retry strategy) |
-| Empty channel (no messages) | iter_messages yields nothing → empty iterator (correct) |
-| Channel with only media (no text) | All messages skipped by filter → empty iterator |
-| `since` set to NOW | iter_messages goes newest-first → first message is older → break immediately → empty iterator |
+| Channel doesn't exist | `ChannelInvalidError` / `UsernameNotOccupiedError` raised → propagate to orchestrator |
+| Channel is private | `ChannelPrivateError` raised → propagate |
+| Channel name malformed | `ValueError` raised → propagate |
+| Network failure mid-collection | Telethon raises (`ConnectionError` / `TimeoutError` / `RPCError`) → propagate |
+| Rate-limited by Telegram | `FloodWaitError(seconds=N)` raised → propagate |
+| Session revoked | `AuthKeyUnregisteredError` raised → propagate (orchestrator treats fatal) |
+| `source_type != TELEGRAM` | Structural skip — empty iterator, NO error (not our adapter) |
+| Empty channel (no messages) | iter_messages yields nothing → empty iterator (correct, not an error) |
+| Channel with only media (no text) | All messages skipped by length filter → empty iterator |
+| `since` set to NOW | iter_messages newest-first → first message older → break immediately → empty iterator |
 | `since` is None | Collect from beginning to current — initial backfill mode |
-| Same message yielded twice (rare) | Orchestrator's `save_document()` catches `IntegrityError` on URL unique constraint |
+| Same message yielded twice (rare) | Orchestrator's `save_document()` catches `IntegrityError` on URL unique constraint (not Source's concern) |
 
 ---
 

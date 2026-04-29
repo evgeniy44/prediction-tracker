@@ -411,13 +411,14 @@ git commit -m "feat(sources): TelegramSource respects 'since' cutoff for increme
 
 ---
 
-## Task 4: TelegramSource — non-Telegram source skip + channel access errors
+## Task 4: TelegramSource — non-Telegram structural skip + propagate channel errors
 
 **Files:**
 - Modify: `tests/sources/test_telegram.py`
-- Modify: `src/prophet_checker/sources/telegram.py`
 
-- [ ] **Step 1: Add failing tests for non-Telegram source + channel errors**
+**Принцип:** Source НЕ catch'ить помилки `get_entity()`. Винятки propagate'яться вгору, orchestrator (Task 15) їх класифікує і вирішує політику. Виняток — `source_type != TELEGRAM`: це structural skip, не error.
+
+- [ ] **Step 1: Add failing tests for structural skip + propagate**
 
 Append to `tests/sources/test_telegram.py`:
 
@@ -452,19 +453,13 @@ async def test_collect_skips_non_telegram_source():
     UsernameNotOccupiedError,
     ValueError,
 ])
-async def test_collect_handles_channel_access_error(error_class, caplog):
+async def test_collect_propagates_channel_access_error(error_class):
     client = make_mock_client([], get_entity_raises=error_class)
     source = TelegramSource(client)
 
-    yielded = []
-    with caplog.at_level("WARNING"):
-        async for doc in source.collect(make_person_source()):
-            yielded.append(doc)
-
-    assert yielded == []
-    assert any(
-        "Cannot access" in record.message for record in caplog.records
-    )
+    with pytest.raises(error_class):
+        async for _ in source.collect(make_person_source()):
+            pass
 ```
 
 - [ ] **Step 2: Run tests, verify failures**
@@ -474,72 +469,33 @@ async def test_collect_handles_channel_access_error(error_class, caplog):
 ```
 
 Expected:
-- `test_collect_skips_non_telegram_source` may already pass (impl checks `source_type`)
-- `test_collect_handles_channel_access_error` (5 parametrized variants) fails — exceptions propagate
+- `test_collect_skips_non_telegram_source` already passes (impl checks `source_type` since Task 2)
+- `test_collect_propagates_channel_access_error` (5 parametrized) — already passes! Бо в Task 2 ми НЕ wrap'или `get_entity` у try/except. Exception propagate'иться natively.
 
-- [ ] **Step 3: Wrap `get_entity` in try/except**
+- [ ] **Step 3: Verify no implementation change needed**
 
-In `src/prophet_checker/sources/telegram.py`, update imports and `collect()`:
+Open `src/prophet_checker/sources/telegram.py` і переконайся що `get_entity()` НЕ обгорнуто try/except. Має бути просто:
 
 ```python
-from telethon import TelegramClient
-from telethon.errors import (
-    ChannelInvalidError, ChannelPrivateError,
-    UsernameInvalidError, UsernameNotOccupiedError,
-)
-
-# ... (existing __init__ etc.) ...
-
-    async def collect(
-        self,
-        person_source: PersonSource,
-        since: datetime | None = None,
-    ) -> AsyncIterator[RawDocument]:
-        if person_source.source_type != SourceType.TELEGRAM:
-            return
-
         channel = person_source.source_identifier
-
-        try:
-            entity = await self._client.get_entity(channel)
-        except (
-            ChannelInvalidError, ChannelPrivateError,
-            UsernameInvalidError, UsernameNotOccupiedError, ValueError,
-        ) as e:
-            logger.warning("Cannot access @%s: %s", channel, e)
-            return
-
-        async for msg in self._client.iter_messages(entity):
-            if since is not None and msg.date < since:
-                break
-
-            if not msg.text or len(msg.text.strip()) < self._min_text_length:
-                continue
-
-            yield RawDocument(
-                id=str(uuid4()),
-                person_id=person_source.person_id,
-                source_type=SourceType.TELEGRAM,
-                url=f"https://t.me/{channel}/{msg.id}",
-                published_at=msg.date,
-                raw_text=msg.text.strip(),
-                language="uk",
-            )
+        entity = await self._client.get_entity(channel)
 ```
 
-- [ ] **Step 4: Run tests, verify all pass**
+Якщо там є try/except — видалити. Source має лишатись pure adapter без error swallowing.
+
+- [ ] **Step 4: Run full test file, verify all pass**
 
 ```bash
 .venv/bin/python -m pytest tests/sources/test_telegram.py -v
 ```
 
-Expected: 11 passed (5 prior + 1 non-telegram + 5 parametrized errors).
+Expected: 11 passed (5 prior + 1 structural skip + 5 parametrized propagation).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/prophet_checker/sources/telegram.py tests/sources/test_telegram.py
-git commit -m "feat(sources): TelegramSource handles non-telegram source + channel-access errors (Task 21)"
+git add tests/sources/test_telegram.py
+git commit -m "test(sources): TelegramSource propagates channel-access errors + structural skip for non-Telegram (Task 21)"
 ```
 
 ---
