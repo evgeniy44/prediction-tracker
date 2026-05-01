@@ -206,7 +206,8 @@ async def test_embed_failure_halts_channel_no_save():
 
     ch = report.channels_processed[0]
     assert ch.error is not None
-    assert "embed" in ch.error.lower() or "down" in ch.error.lower()
+    assert "halted at step=processing" in ch.error
+    assert "embed API down" in ch.error
     assert len(prediction_repo._predictions) == 0
     updated = await source_repo.get_person_sources("p1")
     assert updated[0].last_collected_at == datetime(2024, 1, 1, tzinfo=UTC)

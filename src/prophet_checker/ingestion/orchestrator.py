@@ -6,7 +6,7 @@ from typing import Mapping
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from prophet_checker.ingestion.report import ChannelReport, CycleReport
-from prophet_checker.models.domain import SourceType
+from prophet_checker.models.domain import PersonSource, SourceType
 from prophet_checker.sources.base import Source
 from prophet_checker.storage.interfaces import (
     PredictionRepository,
@@ -45,7 +45,7 @@ class IngestionOrchestrator:
             channels_processed=channels,
         )
 
-    async def _process_channel(self, ps) -> ChannelReport:
+    async def _process_channel(self, ps: PersonSource) -> ChannelReport:
         report = ChannelReport(
             person_source_id=ps.id,
             cursor_advanced_to=ps.last_collected_at,
