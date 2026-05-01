@@ -420,7 +420,27 @@ git commit -m "feat(sources): TelegramSource respects 'since' cutoff for increme
 
 - [ ] **Step 1: Add failing tests for structural skip + propagate**
 
-Append to `tests/sources/test_telegram.py`:
+Note: This step also extends `make_mock_client` to accept `get_entity_raises` parameter within this task's test code (see updated helper below). Task 2 removed the parameter for strict YAGNI; Task 4 re-introduces it locally.
+
+First, update the `make_mock_client` helper to restore the `get_entity_raises` parameter:
+
+```python
+def make_mock_client(messages, get_entity_raises=None):
+    client = MagicMock()
+    if get_entity_raises is not None:
+        client.get_entity = AsyncMock(side_effect=get_entity_raises("test"))
+    else:
+        client.get_entity = AsyncMock(return_value=MagicMock())
+
+    async def iter_messages_gen(entity):
+        for m in messages:
+            yield m
+
+    client.iter_messages = iter_messages_gen
+    return client
+```
+
+Then append the new tests to `tests/sources/test_telegram.py`:
 
 ```python
 from telethon.errors import (

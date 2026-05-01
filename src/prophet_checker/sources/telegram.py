@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import AsyncIterator
 from uuid import uuid4
@@ -10,8 +9,6 @@ from telethon import TelegramClient
 from prophet_checker.models.domain import (
     PersonSource, RawDocument, SourceType,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class TelegramSource:

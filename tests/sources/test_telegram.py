@@ -17,12 +17,9 @@ def make_message(msg_id: int, text: str | None, date: datetime):
     return m
 
 
-def make_mock_client(messages, get_entity_raises=None):
+def make_mock_client(messages):
     client = MagicMock()
-    if get_entity_raises is not None:
-        client.get_entity = AsyncMock(side_effect=get_entity_raises("test"))
-    else:
-        client.get_entity = AsyncMock(return_value=MagicMock())
+    client.get_entity = AsyncMock(return_value=MagicMock())
 
     async def iter_messages_gen(entity):
         for m in messages:
