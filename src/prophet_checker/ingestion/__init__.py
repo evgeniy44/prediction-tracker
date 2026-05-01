@@ -1,3 +1,4 @@
-from prophet_checker.ingestion.report import CycleReport, ChannelReport
+from prophet_checker.ingestion.orchestrator import IngestionOrchestrator
+from prophet_checker.ingestion.report import ChannelReport, CycleReport
 
-__all__ = ["CycleReport", "ChannelReport"]
+__all__ = ["ChannelReport", "CycleReport", "IngestionOrchestrator"]
