@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+logger = logging.getLogger(__name__)
 
 from prophet_checker.models.db import (
     PersonDB, PersonSourceDB, PredictionDB, RawDocumentDB,
@@ -171,14 +174,24 @@ class PostgresSourceRepository:
     ) -> None:
         if session is not None:
             db_obj = await session.get(PersonSourceDB, person_source_id)
-            if db_obj is not None:
-                db_obj.last_collected_at = cursor
+            if db_obj is None:
+                logger.warning(
+                    "update_source_cursor: PersonSource not found id=%s",
+                    person_source_id,
+                )
+                return
+            db_obj.last_collected_at = cursor
             return
         async with self._session_factory() as own_session:
             db_obj = await own_session.get(PersonSourceDB, person_source_id)
-            if db_obj is not None:
-                db_obj.last_collected_at = cursor
-                await own_session.commit()
+            if db_obj is None:
+                logger.warning(
+                    "update_source_cursor: PersonSource not found id=%s",
+                    person_source_id,
+                )
+                return
+            db_obj.last_collected_at = cursor
+            await own_session.commit()
 
 
 class PostgresPredictionRepository:

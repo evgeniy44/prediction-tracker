@@ -32,14 +32,14 @@
 | `src/prophet_checker/models/{domain,db}.py` | ✅ | Pydantic domain + SQLAlchemy ORM |
 | `src/prophet_checker/storage/{interfaces,postgres}.py` | ✅ | Protocol + Postgres impl: 4 repositories (Person, Source, Prediction, VectorStore) |
 | `src/prophet_checker/llm/{client,embedding,prompts}.py` | ✅ | LiteLLM-backed clients (LLMClient = completion, EmbeddingClient = embedding — split 2026-05-01); extraction/verification/RAG prompt templates |
-| `src/prophet_checker/analysis/{extractor,verifier}.py` | ✅ | PredictionExtractor + PredictionVerifier (idle — no caller orchestrates) |
-| `src/prophet_checker/sources/{base,telegram}.py` | ✅ | Source Protocol + TelegramSource adapter (Task 21 done 2026-04-29). Yields RawDocument; persistence handled by orchestrator. |
-| `src/prophet_checker/ingestion.py` | 📋 | Заплановано Task 15 |
+| `src/prophet_checker/analysis/{extractor,verifier}.py` | ✅ | PredictionExtractor + PredictionVerifier (orchestrator wires extractor since Task 15) |
+| `src/prophet_checker/sources/{base,telegram,mock}.py` | ✅ | Source Protocol + TelegramSource (Task 21) + MockSource (Task 15 testing) |
+| `src/prophet_checker/ingestion/{orchestrator,report}.py` | ✅ | IngestionOrchestrator + CycleReport/ChannelReport (Task 15 done 2026-05-01) |
 | `src/prophet_checker/bot/` | 📋 | Заплановано пізніше |
 | `src/prophet_checker/__main__.py` (FastAPI) | 📋 | Заплановано Task 16 |
 | `scripts/evaluate_detection.py` | ✅ working script | Task 13 detection benchmark |
 | `scripts/extraction_quality_eval.py` + `extraction_judge_prompts.py` | ✅ working scripts | Task 13.5 LLM-as-judge eval (3-stage) |
-| `tests/` (101 tests) | ✅ | detection + extraction quality eval + sources + analysis + llm (client + embedding) + storage; production-class тести скрізь |
+| `tests/` (114 tests) | ✅ | detection + extraction quality eval + sources + analysis + llm (client + embedding) + storage + ingestion (orchestrator + integration); production-class тести скрізь |
 
 ---
 
