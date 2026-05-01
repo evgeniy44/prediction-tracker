@@ -160,3 +160,53 @@ async def test_empty_predictions_advances_cursor_without_save():
     assert embedder.embed.call_count == 0
     updated = await source_repo.get_person_sources("p1")
     assert updated[0].last_collected_at == datetime(2024, 1, 5, tzinfo=UTC)
+
+
+async def test_embed_failure_halts_channel_no_save():
+    person_source = PersonSource(
+        id="ps1",
+        person_id="p1",
+        source_type=SourceType.TELEGRAM,
+        source_identifier="@arestovich",
+        last_collected_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    doc = RawDocument(
+        id="tg:arestovich:1",
+        person_id="p1",
+        source_type=SourceType.TELEGRAM,
+        url="https://t.me/arestovich/1",
+        published_at=datetime(2024, 1, 5, tzinfo=UTC),
+        raw_text="Has predictions",
+    )
+    source_repo = FakeSourceRepo()
+    await source_repo.save_person_source(person_source)
+    prediction_repo = FakePredictionRepo()
+    pred = Prediction(
+        id="pred-1",
+        document_id="x",
+        person_id="p1",
+        claim_text="claim",
+        prediction_date=date(2024, 1, 1),
+    )
+    extractor = _make_extractor([pred])
+    embedder = MagicMock()
+    embedder.embed = AsyncMock(side_effect=RuntimeError("embed API down"))
+    factory, _ = _stub_session_factory()
+
+    orchestrator = IngestionOrchestrator(
+        session_factory=factory,
+        source_repo=source_repo,
+        prediction_repo=prediction_repo,
+        extractor=extractor,
+        embedder=embedder,
+        sources={SourceType.TELEGRAM: MockSource([doc])},
+    )
+
+    report = await orchestrator.run_cycle()
+
+    ch = report.channels_processed[0]
+    assert ch.error is not None
+    assert "embed" in ch.error.lower() or "down" in ch.error.lower()
+    assert len(prediction_repo._predictions) == 0
+    updated = await source_repo.get_person_sources("p1")
+    assert updated[0].last_collected_at == datetime(2024, 1, 1, tzinfo=UTC)
