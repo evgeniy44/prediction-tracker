@@ -42,6 +42,9 @@ class PersonSourceDB(Base):
     source_type: Mapped[str] = mapped_column(String(50), nullable=False)
     source_identifier: Mapped[str] = mapped_column(String(500), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     person: Mapped[PersonDB] = relationship(back_populates="sources")
 

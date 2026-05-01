@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from prophet_checker.models.domain import (
     Person,
     PersonSource,
@@ -69,3 +69,28 @@ def test_prediction_status_enum():
 def test_source_type_enum():
     assert SourceType.TELEGRAM.value == "telegram"
     assert SourceType.NEWS.value == "news"
+
+
+def test_person_source_default_last_collected_at_is_creation_time():
+    before = datetime.now(UTC)
+    ps = PersonSource(
+        id="ps1",
+        person_id="p1",
+        source_type=SourceType.TELEGRAM,
+        source_identifier="@arestovich",
+    )
+    after = datetime.now(UTC)
+    assert ps.last_collected_at is not None
+    assert before <= ps.last_collected_at <= after
+
+
+def test_person_source_explicit_last_collected_at_preserved():
+    explicit = datetime(2024, 1, 15, tzinfo=UTC)
+    ps = PersonSource(
+        id="ps1",
+        person_id="p1",
+        source_type=SourceType.TELEGRAM,
+        source_identifier="@arestovich",
+        last_collected_at=explicit,
+    )
+    assert ps.last_collected_at == explicit

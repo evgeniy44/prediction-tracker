@@ -34,6 +34,11 @@ class PersonSource(BaseModel):
     source_type: SourceType
     source_identifier: str
     enabled: bool = True
+    last_collected_at: datetime | None = None
+
+    def model_post_init(self, __context) -> None:
+        if self.last_collected_at is None:
+            self.last_collected_at = datetime.now(UTC)
 
 
 class RawDocument(BaseModel):

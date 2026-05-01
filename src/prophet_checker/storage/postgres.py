@@ -30,6 +30,7 @@ def domain_to_person_source_db(ps: PersonSource) -> PersonSourceDB:
     return PersonSourceDB(
         id=ps.id, person_id=ps.person_id, source_type=ps.source_type.value,
         source_identifier=ps.source_identifier, enabled=ps.enabled,
+        last_collected_at=ps.last_collected_at,
     )
 
 
@@ -37,6 +38,7 @@ def person_source_db_to_domain(db: PersonSourceDB) -> PersonSource:
     return PersonSource(
         id=db.id, person_id=db.person_id, source_type=SourceType(db.source_type),
         source_identifier=db.source_identifier, enabled=db.enabled,
+        last_collected_at=db.last_collected_at,
     )
 
 
