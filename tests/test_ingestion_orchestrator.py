@@ -258,3 +258,71 @@ async def test_save_failure_halts_channel():
     assert ch.error is not None
     updated = await source_repo.get_person_sources("p1")
     assert updated[0].last_collected_at == datetime(2024, 1, 1, tzinfo=UTC)
+
+
+async def test_one_channel_halt_does_not_block_others():
+    ps1 = PersonSource(
+        id="ps1",
+        person_id="p1",
+        source_type=SourceType.TELEGRAM,
+        source_identifier="@arestovich",
+        last_collected_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    ps2 = PersonSource(
+        id="ps2",
+        person_id="p2",
+        source_type=SourceType.TELEGRAM,
+        source_identifier="@podolyak",
+        last_collected_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    docs = [
+        RawDocument(
+            id="tg:arestovich:1",
+            person_id="p1",
+            source_type=SourceType.TELEGRAM,
+            url="https://t.me/arestovich/1",
+            published_at=datetime(2024, 1, 5, tzinfo=UTC),
+            raw_text="Bad post",
+        ),
+        RawDocument(
+            id="tg:podolyak:1",
+            person_id="p2",
+            source_type=SourceType.TELEGRAM,
+            url="https://t.me/podolyak/1",
+            published_at=datetime(2024, 1, 5, tzinfo=UTC),
+            raw_text="Good post",
+        ),
+    ]
+    source_repo = FakeSourceRepo()
+    await source_repo.save_person_source(ps1)
+    await source_repo.save_person_source(ps2)
+    prediction_repo = FakePredictionRepo()
+
+    pred = Prediction(
+        id="pred-1",
+        document_id="x",
+        person_id="p2",
+        claim_text="claim",
+        prediction_date=date(2024, 1, 1),
+    )
+    extractor = MagicMock()
+    extractor.extract = AsyncMock(side_effect=[RuntimeError("LLM down"), [pred]])
+    embedder = _make_embedder()
+    factory, _ = _stub_session_factory()
+
+    orchestrator = IngestionOrchestrator(
+        session_factory=factory,
+        source_repo=source_repo,
+        prediction_repo=prediction_repo,
+        extractor=extractor,
+        embedder=embedder,
+        sources={SourceType.TELEGRAM: MockSource(docs)},
+    )
+
+    report = await orchestrator.run_cycle()
+
+    assert len(report.channels_processed) == 2
+    by_id = {c.person_source_id: c for c in report.channels_processed}
+    assert by_id["ps1"].error is not None
+    assert by_id["ps2"].error is None
+    assert by_id["ps2"].predictions_extracted == 1
