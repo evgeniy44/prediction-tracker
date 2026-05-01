@@ -4,6 +4,12 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from telethon.errors import (
+    ChannelInvalidError,
+    ChannelPrivateError,
+    UsernameInvalidError,
+    UsernameNotOccupiedError,
+)
 
 from prophet_checker.models.domain import PersonSource, SourceType
 from prophet_checker.sources.telegram import TelegramSource
@@ -17,9 +23,12 @@ def make_message(msg_id: int, text: str | None, date: datetime):
     return m
 
 
-def make_mock_client(messages):
+def make_mock_client(messages, get_entity_raises=None):
     client = MagicMock()
-    client.get_entity = AsyncMock(return_value=MagicMock())
+    if get_entity_raises is not None:
+        client.get_entity = AsyncMock(side_effect=get_entity_raises("test"))
+    else:
+        client.get_entity = AsyncMock(return_value=MagicMock())
 
     async def iter_messages_gen(entity):
         for m in messages:
@@ -114,6 +123,37 @@ async def test_collect_respects_since_param():
     assert len(yielded) == 2
     assert yielded[0].published_at == datetime(2024, 8, 1, tzinfo=UTC)
     assert yielded[1].published_at == datetime(2024, 7, 1, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_collect_skips_non_telegram_source():
+    msgs = [make_message(1, "А" * 100, datetime(2024, 6, 1, tzinfo=UTC))]
+    client = make_mock_client(msgs)
+    source = TelegramSource(client)
+    ps = make_person_source(source_type=SourceType.NEWS)
+
+    yielded = []
+    async for doc in source.collect(ps):
+        yielded.append(doc)
+
+    assert yielded == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_class", [
+    ChannelInvalidError,
+    ChannelPrivateError,
+    UsernameInvalidError,
+    UsernameNotOccupiedError,
+    ValueError,
+])
+async def test_collect_propagates_channel_access_error(error_class):
+    client = make_mock_client([], get_entity_raises=error_class)
+    source = TelegramSource(client)
+
+    with pytest.raises(error_class):
+        async for _ in source.collect(make_person_source()):
+            pass
 
 
 @pytest.mark.asyncio
