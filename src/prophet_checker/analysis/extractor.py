@@ -28,12 +28,6 @@ class PredictionExtractor:
         person_name: str,
         published_date: str,
     ) -> list[Prediction]:
-        """Call the LLM to extract predictions from *text*.
-
-        Returns a list of :class:`Prediction` domain objects with
-        ``status=UNRESOLVED`` and an embedding vector already filled in.
-        Returns an empty list if the LLM fails or finds no predictions.
-        """
         try:
             prompt = build_extraction_prompt(
                 text=text,
