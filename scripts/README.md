@@ -4,21 +4,20 @@ Python-скрипти живуть плоско в `scripts/` (через cross-
 
 ## Сценарії
 
-### 1. Збір даних з Telegram → `data/`
+### 1. Telegram-збір → переселено в `src/prophet_checker/sources/telegram.py`
 
-```bash
-.venv/bin/python scripts/collect_telegram_posts.py
-```
+Логіка переселена в production-модуль (Task 21, 2026-04-29).
+Виклик тепер відбувається через `IngestionOrchestrator` (Task 15, planned)
+а не через CLI-скрипт.
 
-Викачує текстові пости з каналів Telegram, рівномірно семплює по роках, зберігає в `data/<channel>/all.json`.
+Історичні artifacts (від попередніх script-runs) залишаються в `data/`:
 
 | Файл | Опис |
 |------|------|
-| `collect_telegram_posts.py` | Збирач (telethon-based) |
 | `tg_session.session` | Telethon auth artifact (gitignored) |
-| `data/sample_posts.json` | Канонічний датасет (≈5500 постів, gitignored через розмір) |
+| `data/sample_posts.json` | Канонічний multi-author датасет для evals (1049 постів) |
 | `data/sample_posts_100.json` | Малий sample для швидких тестів |
-| `data/arestovich/all.json` | Сирий dump каналу Арестовича |
+| `data/arestovich/all.json` | Сирий dump каналу Арестовича від попереднього script-run |
 | `data/zdanov/1.json` | Сирий dump каналу Жданова |
 
 ### 2. Gold-лейбли → `data/gold_labels.json`

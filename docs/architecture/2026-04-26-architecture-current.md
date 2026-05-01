@@ -17,7 +17,7 @@
 | Gold annotation (130 manually-labeled posts) | NEW ✅ | Task 12 — необхідна основа для evals |
 | Verifier v2 (4-status + retry-loop policy) | NEW ✅ designed | Resolves target_date=null у 70-90 % claims, see [`../verifier-v2/`](../verifier-v2/) |
 | Two-tier model strategy (Flash Lite + Pro Preview) | 🚧 open | Task 13.5 output, see [`cost-comparison`](../extraction-quality-eval/2026-04-26-gemini-pro-vs-lite-cost.md) |
-| `src/sources/` module (TelegramCollector, NewsCollector) | 📋 still planned | Сирий збір живе в `scripts/collect_telegram_posts.py`; адаптери чекають Task 21 |
+| `src/prophet_checker/sources/` module (TelegramSource) | ✅ done 2026-04-29 | Task 21 done — `TelegramSource` реалізовано; `scripts/collect_telegram_posts.py` видалено. NewsCollector не в scope MVP. |
 | `src/bot/` Telegram handlers | 📋 still planned | Chat-frontend Phase 2 |
 | `src/ingestion/` orchestrator | 📋 still planned | Task 15 — наступний крок |
 | `src/prophet_checker/{config, llm, models, storage, analysis}/` | ✅ implemented | 88 проходячих unit-тестів |
@@ -33,14 +33,13 @@
 | `src/prophet_checker/storage/{interfaces,postgres}.py` | ✅ | Protocol + Postgres impl: 4 repositories (Person, Source, Prediction, VectorStore) |
 | `src/prophet_checker/llm/{client,prompts}.py` | ✅ | LiteLLM-backed client; extraction/verification/RAG prompt templates |
 | `src/prophet_checker/analysis/{extractor,verifier}.py` | ✅ | PredictionExtractor + PredictionVerifier (idle — no caller orchestrates) |
-| `src/prophet_checker/sources/` | 📋 | Заплановано Task 21 — TelegramCollector + NewsCollector |
+| `src/prophet_checker/sources/{base,telegram}.py` | ✅ | Source Protocol + TelegramSource adapter (Task 21 done 2026-04-29). Yields RawDocument; persistence handled by orchestrator. |
 | `src/prophet_checker/ingestion.py` | 📋 | Заплановано Task 15 |
 | `src/prophet_checker/bot/` | 📋 | Заплановано пізніше |
 | `src/prophet_checker/__main__.py` (FastAPI) | 📋 | Заплановано Task 16 |
-| `scripts/collect_telegram_posts.py` | 🚧 working script | Не модуль — one-off писати в `data/<channel>/all.json`. Майбутнє виносу: Task 21 |
 | `scripts/evaluate_detection.py` | ✅ working script | Task 13 detection benchmark |
 | `scripts/extraction_quality_eval.py` + `extraction_judge_prompts.py` | ✅ working scripts | Task 13.5 LLM-as-judge eval (3-stage) |
-| `tests/` (88 tests) | ✅ | 60 detection + 28 extraction quality eval; production-class тести в analysis/llm/storage |
+| `tests/` (102 tests) | ✅ | 60 detection + 28 extraction quality eval + 14 sources (Task 21); production-class тести в analysis/llm/storage |
 
 ---
 
@@ -89,7 +88,7 @@
 2. **Task 15** — `IngestionOrchestrator`: збирає на цикл `collect → extract → save`. Тестується через mock-source.
 3. **Task 16** — FastAPI entry: HTTP-trigger для orchestrator (поки без bot).
 4. **Task 17-19** — Docker Compose, Alembic міграція на справжню Postgres, integration smoke test.
-5. **Task 21** — `src/sources/telegram.py`: переселення `scripts/collect_telegram_posts.py` в src/-модуль через `Source.collect()` інтерфейс.
+5. **Task 21** — ✅ done 2026-04-29: `src/prophet_checker/sources/telegram.py:TelegramSource` — переселення завершено, legacy script видалено.
 
 **Open architectural questions** (не вирішено в цьому doc):
 
