@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import AsyncIterator
-from uuid import uuid4
 
 from telethon import TelegramClient
 
@@ -38,11 +37,10 @@ class TelegramSource:
                 continue
 
             yield RawDocument(
-                id=str(uuid4()),
+                id=f"tg:{channel}:{msg.id}",
                 person_id=person_source.person_id,
                 source_type=SourceType.TELEGRAM,
                 url=f"https://t.me/{channel}/{msg.id}",
                 published_at=msg.date,
                 raw_text=msg.text.strip(),
-                language="uk",
             )
