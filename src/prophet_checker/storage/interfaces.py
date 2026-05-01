@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 from prophet_checker.models.domain import (
     Person,
@@ -30,10 +33,21 @@ class SourceRepository(Protocol):
     async def get_last_collected_at(
         self, person_id: str, source_type: SourceType
     ) -> datetime | None: ...
+    async def list_active_sources(self) -> list[PersonSource]: ...
+    async def update_source_cursor(
+        self,
+        person_source_id: str,
+        cursor: datetime,
+        session: "AsyncSession | None" = None,
+    ) -> None: ...
 
 
 class PredictionRepository(Protocol):
-    async def save(self, prediction: Prediction) -> Prediction: ...
+    async def save(
+        self,
+        prediction: Prediction,
+        session: "AsyncSession | None" = None,
+    ) -> Prediction: ...
     async def get_by_person(
         self, person_id: str, status: PredictionStatus | None = None
     ) -> list[Prediction]: ...
