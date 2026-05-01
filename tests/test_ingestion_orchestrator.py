@@ -377,3 +377,84 @@ async def test_cursor_advances_per_post():
     assert cursor_calls[0] == ("ps1", datetime(2024, 1, 2, tzinfo=UTC))
     assert cursor_calls[1] == ("ps1", datetime(2024, 1, 3, tzinfo=UTC))
     assert cursor_calls[2] == ("ps1", datetime(2024, 1, 4, tzinfo=UTC))
+
+
+async def test_cycle_report_aggregates_counts():
+    person_source = PersonSource(
+        id="ps1",
+        person_id="p1",
+        source_type=SourceType.TELEGRAM,
+        source_identifier="@arestovich",
+        last_collected_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    docs = [
+        RawDocument(
+            id=f"tg:arestovich:{i}",
+            person_id="p1",
+            source_type=SourceType.TELEGRAM,
+            url=f"https://t.me/arestovich/{i}",
+            published_at=datetime(2024, 1, 2 + i, tzinfo=UTC),
+            raw_text=f"Post {i}",
+        )
+        for i in range(3)
+    ]
+    source_repo = FakeSourceRepo()
+    await source_repo.save_person_source(person_source)
+    prediction_repo = FakePredictionRepo()
+    pred = Prediction(
+        id="pred-1",
+        document_id="x",
+        person_id="p1",
+        claim_text="claim",
+        prediction_date=date(2024, 1, 1),
+    )
+    extractor = MagicMock()
+    extractor.extract = AsyncMock(side_effect=[[pred, pred], [], [pred]])
+    embedder = _make_embedder()
+    factory, _ = _stub_session_factory()
+
+    orchestrator = IngestionOrchestrator(
+        session_factory=factory,
+        source_repo=source_repo,
+        prediction_repo=prediction_repo,
+        extractor=extractor,
+        embedder=embedder,
+        sources={SourceType.TELEGRAM: MockSource(docs)},
+    )
+
+    report = await orchestrator.run_cycle()
+
+    ch = report.channels_processed[0]
+    assert ch.posts_seen == 3
+    assert ch.posts_with_predictions == 2
+    assert ch.predictions_extracted == 3
+    assert report.started_at <= report.finished_at
+
+
+async def test_unregistered_source_type_marks_error_and_continues():
+    ps_news = PersonSource(
+        id="ps_news",
+        person_id="p1",
+        source_type=SourceType.NEWS,
+        source_identifier="some-news-feed",
+        last_collected_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    source_repo = FakeSourceRepo()
+    await source_repo.save_person_source(ps_news)
+    factory, _ = _stub_session_factory()
+
+    orchestrator = IngestionOrchestrator(
+        session_factory=factory,
+        source_repo=source_repo,
+        prediction_repo=FakePredictionRepo(),
+        extractor=_make_extractor([]),
+        embedder=_make_embedder(),
+        sources={SourceType.TELEGRAM: MockSource([])},
+    )
+
+    report = await orchestrator.run_cycle()
+
+    assert len(report.channels_processed) == 1
+    ch = report.channels_processed[0]
+    assert ch.error is not None
+    assert "NEWS" in ch.error.upper() or "news" in ch.error
