@@ -25,15 +25,3 @@ async def test_llm_client_complete_with_system():
         messages = call_args.kwargs["messages"]
         assert messages[0]["role"] == "system"
         assert messages[0]["content"] == "You are an analyst"
-
-
-async def test_llm_client_embed():
-    client = LLMClient(provider="openai", model="gpt-4o-mini", api_key="sk-test",
-                       embedding_model="text-embedding-3-small")
-    mock_response = AsyncMock()
-    mock_response.data = [AsyncMock(embedding=[0.1, 0.2, 0.3])]
-
-    with patch("prophet_checker.llm.client.aembedding", return_value=mock_response) as mock_call:
-        result = await client.embed("Test text")
-        assert result == [0.1, 0.2, 0.3]
-        mock_call.assert_called_once()
