@@ -96,11 +96,12 @@ flowchart TD
 
 ```python
 from datetime import datetime
-from typing import AsyncIterator, Protocol
+from typing import AsyncIterator, Protocol, runtime_checkable
 
 from prophet_checker.models.domain import PersonSource, RawDocument
 
 
+@runtime_checkable
 class Source(Protocol):
     """Pluggable adapter for raw-document collection.
 
@@ -109,7 +110,7 @@ class Source(Protocol):
     write to file, dedupe, etc.).
     """
 
-    async def collect(
+    def collect(
         self,
         person_source: PersonSource,
         since: datetime | None = None,

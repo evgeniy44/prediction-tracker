@@ -24,5 +24,5 @@ class _ConformantImpl:
 
 
 def test_source_protocol_structural_check():
-    impl: Source = _ConformantImpl()
-    assert impl is not None
+    impl = _ConformantImpl()
+    assert isinstance(impl, Source)
