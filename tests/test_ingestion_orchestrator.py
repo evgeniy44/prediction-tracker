@@ -326,3 +326,54 @@ async def test_one_channel_halt_does_not_block_others():
     assert by_id["ps1"].error is not None
     assert by_id["ps2"].error is None
     assert by_id["ps2"].predictions_extracted == 1
+
+
+async def test_cursor_advances_per_post():
+    person_source = PersonSource(
+        id="ps1",
+        person_id="p1",
+        source_type=SourceType.TELEGRAM,
+        source_identifier="@arestovich",
+        last_collected_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    docs = [
+        RawDocument(
+            id=f"tg:arestovich:{i}",
+            person_id="p1",
+            source_type=SourceType.TELEGRAM,
+            url=f"https://t.me/arestovich/{i}",
+            published_at=datetime(2024, 1, 2 + i, tzinfo=UTC),
+            raw_text=f"Post {i}",
+        )
+        for i in range(3)
+    ]
+    source_repo = FakeSourceRepo()
+    await source_repo.save_person_source(person_source)
+    cursor_calls = []
+    original_update = source_repo.update_source_cursor
+
+    async def tracking_update(person_source_id, cursor, session=None):
+        cursor_calls.append((person_source_id, cursor))
+        return await original_update(person_source_id, cursor, session=session)
+
+    source_repo.update_source_cursor = tracking_update
+
+    extractor = _make_extractor([])
+    embedder = _make_embedder()
+    factory, _ = _stub_session_factory()
+
+    orchestrator = IngestionOrchestrator(
+        session_factory=factory,
+        source_repo=source_repo,
+        prediction_repo=FakePredictionRepo(),
+        extractor=extractor,
+        embedder=embedder,
+        sources={SourceType.TELEGRAM: MockSource(docs)},
+    )
+
+    await orchestrator.run_cycle()
+
+    assert len(cursor_calls) == 3
+    assert cursor_calls[0] == ("ps1", datetime(2024, 1, 2, tzinfo=UTC))
+    assert cursor_calls[1] == ("ps1", datetime(2024, 1, 3, tzinfo=UTC))
+    assert cursor_calls[2] == ("ps1", datetime(2024, 1, 4, tzinfo=UTC))
