@@ -93,3 +93,41 @@ async def test_collect_preserves_published_at():
         yielded.append(doc)
 
     assert yielded[0].published_at == msg_date
+
+
+@pytest.mark.asyncio
+async def test_collect_respects_since_param():
+    long_text = "А" * 100
+    msgs = [
+        make_message(3, long_text, datetime(2024, 8, 1, tzinfo=UTC)),
+        make_message(2, long_text, datetime(2024, 7, 1, tzinfo=UTC)),
+        make_message(1, long_text, datetime(2024, 5, 1, tzinfo=UTC)),
+    ]
+    client = make_mock_client(msgs)
+    source = TelegramSource(client)
+    since = datetime(2024, 6, 1, tzinfo=UTC)
+
+    yielded = []
+    async for doc in source.collect(make_person_source(), since=since):
+        yielded.append(doc)
+
+    assert len(yielded) == 2
+    assert yielded[0].published_at == datetime(2024, 8, 1, tzinfo=UTC)
+    assert yielded[1].published_at == datetime(2024, 7, 1, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_collect_since_none_yields_all():
+    long_text = "А" * 100
+    msgs = [
+        make_message(2, long_text, datetime(2024, 8, 1, tzinfo=UTC)),
+        make_message(1, long_text, datetime(2020, 1, 1, tzinfo=UTC)),
+    ]
+    client = make_mock_client(msgs)
+    source = TelegramSource(client)
+
+    yielded = []
+    async for doc in source.collect(make_person_source(), since=None):
+        yielded.append(doc)
+
+    assert len(yielded) == 2
