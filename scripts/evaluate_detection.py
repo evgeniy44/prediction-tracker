@@ -60,8 +60,6 @@ GOLD_LABELS_PATH = PROJECT_ROOT / "scripts" / "data" / "gold_labels.json"
 SAMPLE_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "sample_posts.json"
 RESULTS_DIR = PROJECT_ROOT / "scripts" / "outputs" / "detection_eval"
 
-EMBEDDING_DIM = 1536  # must match pgvector Vector(1536) column in ORM
-
 PROVIDER_API_KEY_ENV = {
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
@@ -185,34 +183,6 @@ async def classify_post(extractor, post: dict) -> bool | None:
 
 
 # =============================================================================
-# DetectionLLM wrapper
-# =============================================================================
-
-
-class DetectionLLM:
-    """Wrap an LLMClient so that detection-eval use doesn't require embeddings.
-
-    Detection-only eval measures len(predictions) > 0 — embeddings are unnecessary
-    and unavailable for many providers (Gemini/DeepSeek/Groq lack OpenAI-compatible
-    embedding endpoints).
-
-    Delegates ``.complete()`` to the wrapped client (including exception propagation).
-    Stubs ``.embed()`` with a zero-vector of the correct dimensionality — never hits
-    the network.
-    """
-
-    def __init__(self, inner) -> None:
-        self._inner = inner
-
-    async def complete(self, prompt: str, system: str | None = None) -> str:
-        return await self._inner.complete(prompt, system=system)
-
-    async def embed(self, text: str) -> list[float]:
-        # Stub — no real API call. Used only in detection eval context.
-        return [0.0] * EMBEDDING_DIM
-
-
-# =============================================================================
 # Extractor factory
 # =============================================================================
 
@@ -249,10 +219,9 @@ def _default_extractor_factory(model_id: str) -> PredictionExtractor:
         provider=provider,
         model=model,
         api_key=api_key,
-        temperature=0.0,  # determinism for reproducible eval
+        temperature=0.0,
     )
-    wrapped = DetectionLLM(client)
-    return PredictionExtractor(wrapped)
+    return PredictionExtractor(client)
 
 
 # =============================================================================

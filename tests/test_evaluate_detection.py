@@ -6,7 +6,6 @@ on ImportError until scripts/evaluate_detection.py is implemented in Step 2.
 Test groups:
     A — compute_metrics(): pure function, no I/O (6 tests)
     B — classify_post():   extractor call bridge (4 tests)
-    C — DetectionLLM:      wrapper for multi-provider eval (3 tests)
     D — run_evaluation_for_model(): orchestration (4 tests)
 """
 from __future__ import annotations
@@ -16,7 +15,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from evaluate_detection import (
-    DetectionLLM,
     classify_post,
     compute_metrics,
     run_evaluation_for_model,
@@ -169,53 +167,6 @@ async def test_classify_post_forwards_all_required_args_to_extractor():
         person_name="Арестович",
         published_date="2025-01-23",
     )
-
-
-# =============================================================================
-# Group C — DetectionLLM wrapper
-# =============================================================================
-# Contract:
-#   .complete(prompt, system) delegates to inner LLMClient, propagates exceptions.
-#   .embed(text) returns [0.0] * 1536 stub WITHOUT calling inner (bypasses API).
-# Rationale: Gemini/DeepSeek/Groq don't have OpenAI-compatible embedding endpoints,
-# and detection eval only needs count > 0 — embeddings are dead weight.
-
-
-async def test_detection_llm_delegates_complete_to_inner_client():
-    """wrapper.complete() must forward args to inner client and propagate response."""
-    inner = MagicMock()
-    inner.complete = AsyncMock(return_value="inner-response-value")
-    wrapper = DetectionLLM(inner)
-
-    result = await wrapper.complete("my prompt", system="my system")
-
-    assert result == "inner-response-value"
-    inner.complete.assert_called_once_with("my prompt", system="my system")
-
-
-async def test_detection_llm_embed_returns_stub_without_api_call():
-    """wrapper.embed() must return [0.0] * 1536 WITHOUT calling inner.embed()."""
-    inner = MagicMock()
-    # Side-effect raises if called — so any accidental delegation fails the test loudly
-    inner.embed = AsyncMock(side_effect=Exception("inner.embed must not be called"))
-    wrapper = DetectionLLM(inner)
-
-    result = await wrapper.embed("any text to embed")
-
-    assert isinstance(result, list)
-    assert len(result) == 1536  # matches pgvector dimension pinned in ORM
-    assert all(x == 0.0 for x in result)
-    inner.embed.assert_not_called()
-
-
-async def test_detection_llm_complete_propagates_exceptions():
-    """wrapper.complete() must NOT swallow inner exceptions — classify_post relies on this."""
-    inner = MagicMock()
-    inner.complete = AsyncMock(side_effect=RuntimeError("API down"))
-    wrapper = DetectionLLM(inner)
-
-    with pytest.raises(RuntimeError, match="API down"):
-        await wrapper.complete("prompt")
 
 
 # =============================================================================
