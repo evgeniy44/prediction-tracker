@@ -9,10 +9,9 @@ from prophet_checker.analysis.extractor import PredictionExtractor
 from prophet_checker.models.domain import Prediction, PredictionStatus
 
 
-def make_llm(complete_return: str, embed_return: list[float] | None = None):
+def make_llm(complete_return: str):
     llm = MagicMock()
     llm.complete = AsyncMock(return_value=complete_return)
-    llm.embed = AsyncMock(return_value=embed_return or [0.0] * 1536)
     return llm
 
 
@@ -52,7 +51,7 @@ async def test_extract_returns_predictions():
     assert p.document_id == "doc-10"
     assert p.topic == "війна"
     assert p.id is not None  # UUID generated
-    assert len(p.embedding) == 1536
+    assert p.embedding is None
 
 
 async def test_extract_no_predictions():
@@ -68,7 +67,6 @@ async def test_extract_no_predictions():
     )
 
     assert predictions == []
-    llm.embed.assert_not_called()
 
 
 async def test_extract_llm_error_returns_empty():

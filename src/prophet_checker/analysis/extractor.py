@@ -71,13 +71,6 @@ class PredictionExtractor:
             except (ValueError, TypeError):
                 prediction_date = date.fromisoformat(published_date)
 
-            # Generate embedding for semantic search
-            try:
-                embedding = await self._llm.embed(claim)
-            except Exception:
-                logger.exception("Embedding call failed for claim: %s", claim[:60])
-                embedding = None
-
             predictions.append(
                 Prediction(
                     id=str(uuid4()),
@@ -91,7 +84,7 @@ class PredictionExtractor:
                     confidence=0.0,
                     evidence_url=None,
                     evidence_text=None,
-                    embedding=embedding,
+                    embedding=None,
                 )
             )
 
