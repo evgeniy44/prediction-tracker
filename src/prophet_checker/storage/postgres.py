@@ -109,6 +109,12 @@ class PostgresSourceRepository:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self._session_factory = session_factory
 
+    async def list_active_sources(self) -> list[PersonSource]:
+        async with self._session_factory() as session:
+            stmt = select(PersonSourceDB).where(PersonSourceDB.enabled == True)
+            result = await session.execute(stmt)
+            return [person_source_db_to_domain(row) for row in result.scalars().all()]
+
     async def save_person_source(self, ps: PersonSource) -> PersonSource:
         async with self._session_factory() as session:
             db_obj = domain_to_person_source_db(ps)
@@ -157,16 +163,41 @@ class PostgresSourceRepository:
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
 
+    async def update_source_cursor(
+        self,
+        person_source_id: str,
+        cursor: datetime,
+        session: AsyncSession | None = None,
+    ) -> None:
+        if session is not None:
+            db_obj = await session.get(PersonSourceDB, person_source_id)
+            if db_obj is not None:
+                db_obj.last_collected_at = cursor
+            return
+        async with self._session_factory() as own_session:
+            db_obj = await own_session.get(PersonSourceDB, person_source_id)
+            if db_obj is not None:
+                db_obj.last_collected_at = cursor
+                await own_session.commit()
+
 
 class PostgresPredictionRepository:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self._session_factory = session_factory
 
-    async def save(self, prediction: Prediction) -> Prediction:
-        async with self._session_factory() as session:
+    async def save(
+        self,
+        prediction: Prediction,
+        session: AsyncSession | None = None,
+    ) -> Prediction:
+        if session is not None:
             db_obj = domain_to_prediction_db(prediction)
             session.add(db_obj)
-            await session.commit()
+            return prediction
+        async with self._session_factory() as own_session:
+            db_obj = domain_to_prediction_db(prediction)
+            own_session.add(db_obj)
+            await own_session.commit()
             return prediction
 
     async def get_by_person(
