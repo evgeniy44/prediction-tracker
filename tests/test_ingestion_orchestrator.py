@@ -116,3 +116,47 @@ async def test_run_cycle_processes_posts_in_one_channel():
     assert extractor.extract.call_count == 3
     assert embedder.embed.call_count == 3
     assert len(prediction_repo._predictions) == 3
+
+
+async def test_empty_predictions_advances_cursor_without_save():
+    person_source = PersonSource(
+        id="ps1",
+        person_id="p1",
+        source_type=SourceType.TELEGRAM,
+        source_identifier="@arestovich",
+        last_collected_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    doc = RawDocument(
+        id="tg:arestovich:1",
+        person_id="p1",
+        source_type=SourceType.TELEGRAM,
+        url="https://t.me/arestovich/1",
+        published_at=datetime(2024, 1, 5, tzinfo=UTC),
+        raw_text="No predictions here",
+    )
+    source_repo = FakeSourceRepo()
+    await source_repo.save_person_source(person_source)
+    prediction_repo = FakePredictionRepo()
+    extractor = _make_extractor([])
+    embedder = _make_embedder()
+    factory, _ = _stub_session_factory()
+
+    orchestrator = IngestionOrchestrator(
+        session_factory=factory,
+        source_repo=source_repo,
+        prediction_repo=prediction_repo,
+        extractor=extractor,
+        embedder=embedder,
+        sources={SourceType.TELEGRAM: MockSource([doc])},
+    )
+
+    report = await orchestrator.run_cycle()
+
+    ch = report.channels_processed[0]
+    assert ch.posts_seen == 1
+    assert ch.posts_with_predictions == 0
+    assert ch.predictions_extracted == 0
+    assert len(prediction_repo._predictions) == 0
+    assert embedder.embed.call_count == 0
+    updated = await source_repo.get_person_sources("p1")
+    assert updated[0].last_collected_at == datetime(2024, 1, 5, tzinfo=UTC)
