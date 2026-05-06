@@ -19,3 +19,9 @@ def test_settings_defaults():
     )
     assert settings.database_url == "postgresql+asyncpg://prophet:prophet@localhost:5432/prophet_checker"
     assert settings.verification_confidence_threshold == 0.6
+
+
+def test_settings_includes_fastapi_fields(env_vars):
+    settings = Settings()
+    assert settings.openai_api_key == "sk-test-openai-key"
+    assert settings.tg_session_path == "/tmp/test_session"

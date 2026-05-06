@@ -10,3 +10,5 @@ def env_vars(monkeypatch):
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-bot-token")
     monkeypatch.setenv("TELEGRAM_API_ID", "12345")
     monkeypatch.setenv("TELEGRAM_API_HASH", "test-hash")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-openai-key")
+    monkeypatch.setenv("TG_SESSION_PATH", "/tmp/test_session")
