@@ -35,11 +35,11 @@
 | `src/prophet_checker/analysis/{extractor,verifier}.py` | ✅ | PredictionExtractor + PredictionVerifier (orchestrator wires extractor since Task 15) |
 | `src/prophet_checker/sources/{base,telegram,mock}.py` | ✅ | Source Protocol + TelegramSource (Task 21) + MockSource (Task 15 testing) |
 | `src/prophet_checker/ingestion/{orchestrator,report}.py` | ✅ | IngestionOrchestrator + CycleReport/ChannelReport (Task 15 done 2026-05-01) |
+| `src/prophet_checker/{app,factory,__main__}.py` (FastAPI) | ✅ | FastAPI app + build_orchestrator wiring + uvicorn entry (Task 16 done 2026-05-05) |
 | `src/prophet_checker/bot/` | 📋 | Заплановано пізніше |
-| `src/prophet_checker/__main__.py` (FastAPI) | 📋 | Заплановано Task 16 |
 | `scripts/evaluate_detection.py` | ✅ working script | Task 13 detection benchmark |
 | `scripts/extraction_quality_eval.py` + `extraction_judge_prompts.py` | ✅ working scripts | Task 13.5 LLM-as-judge eval (3-stage) |
-| `tests/` (114 tests) | ✅ | detection + extraction quality eval + sources + analysis + llm (client + embedding) + storage + ingestion (orchestrator + integration); production-class тести скрізь |
+| `tests/` (122 tests) | ✅ | detection + extraction quality eval + sources + analysis + llm (client + embedding) + storage + ingestion (orchestrator + integration) + app/factory/config (FastAPI); production-class тести скрізь |
 
 ---
 
