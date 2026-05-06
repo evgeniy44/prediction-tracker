@@ -58,3 +58,18 @@ async def test_ingest_run_503_when_orchestrator_not_initialized():
 
     assert resp.status_code == 503
     assert "orchestrator not initialized" in resp.json()["detail"]
+
+
+async def test_ingest_run_500_on_catastrophic_exception():
+    orchestrator = MagicMock()
+    orchestrator.run_cycle = AsyncMock(side_effect=RuntimeError("boom"))
+    app.state.orchestrator = orchestrator
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/ingest/run")
+
+    assert resp.status_code == 500
+    detail = resp.json()["detail"]
+    assert "RuntimeError" in detail
+    assert "boom" not in detail
