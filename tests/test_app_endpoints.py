@@ -73,3 +73,36 @@ async def test_ingest_run_500_on_catastrophic_exception():
     detail = resp.json()["detail"]
     assert "RuntimeError" in detail
     assert "boom" not in detail
+
+
+async def test_ingest_run_returns_per_channel_errors_as_200():
+    orchestrator = MagicMock()
+    orchestrator.run_cycle = AsyncMock(return_value=CycleReport(
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
+        channels_processed=[
+            ChannelReport(
+                person_source_id="ps1",
+                posts_seen=2,
+                error="halted at step=processing: LLM 503",
+            ),
+            ChannelReport(
+                person_source_id="ps2",
+                posts_seen=5,
+                predictions_extracted=3,
+            ),
+        ],
+    ))
+    app.state.orchestrator = orchestrator
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/ingest/run")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    channels = body["channels_processed"]
+    assert len(channels) == 2
+    assert channels[0]["error"] is not None
+    assert "halted" in channels[0]["error"]
+    assert channels[1]["error"] is None
