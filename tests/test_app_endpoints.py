@@ -10,6 +10,13 @@ from prophet_checker.app import app
 from prophet_checker.ingestion import ChannelReport, CycleReport
 
 
+@pytest.fixture(autouse=True)
+def _clear_orchestrator_state():
+    yield
+    if hasattr(app.state, "orchestrator"):
+        delattr(app.state, "orchestrator")
+
+
 async def test_health_returns_ok():
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -49,9 +56,6 @@ async def test_ingest_run_returns_cycle_report():
 
 
 async def test_ingest_run_503_when_orchestrator_not_initialized():
-    if hasattr(app.state, "orchestrator"):
-        delattr(app.state, "orchestrator")
-
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.post("/ingest/run")
