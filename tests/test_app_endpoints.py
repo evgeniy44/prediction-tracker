@@ -46,3 +46,15 @@ async def test_ingest_run_returns_cycle_report():
     assert len(body["channels_processed"]) == 1
     assert body["channels_processed"][0]["person_source_id"] == "ps1"
     assert body["channels_processed"][0]["predictions_extracted"] == 5
+
+
+async def test_ingest_run_503_when_orchestrator_not_initialized():
+    if hasattr(app.state, "orchestrator"):
+        delattr(app.state, "orchestrator")
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/ingest/run")
+
+    assert resp.status_code == 503
+    assert "orchestrator not initialized" in resp.json()["detail"]
