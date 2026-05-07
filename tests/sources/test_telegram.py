@@ -30,11 +30,19 @@ def make_mock_client(messages, get_entity_raises=None):
     else:
         client.get_entity = AsyncMock(return_value=MagicMock())
 
-    async def iter_messages_gen(entity):
-        for m in messages:
-            yield m
+    captured_kwargs: dict = {}
 
-    client.iter_messages = iter_messages_gen
+    def iter_messages_factory(entity, **kwargs):
+        captured_kwargs.update(kwargs)
+
+        async def gen():
+            for m in messages:
+                yield m
+
+        return gen()
+
+    client.iter_messages = iter_messages_factory
+    client._iter_kwargs = captured_kwargs
     return client
 
 
@@ -105,12 +113,11 @@ async def test_collect_preserves_published_at():
 
 
 @pytest.mark.asyncio
-async def test_collect_respects_since_param():
+async def test_collect_passes_reverse_and_offset_date_to_iter_messages():
     long_text = "А" * 100
     msgs = [
-        make_message(3, long_text, datetime(2024, 8, 1, tzinfo=UTC)),
-        make_message(2, long_text, datetime(2024, 7, 1, tzinfo=UTC)),
-        make_message(1, long_text, datetime(2024, 5, 1, tzinfo=UTC)),
+        make_message(1, long_text, datetime(2024, 7, 1, tzinfo=UTC)),
+        make_message(2, long_text, datetime(2024, 8, 1, tzinfo=UTC)),
     ]
     client = make_mock_client(msgs)
     source = TelegramSource(client)
@@ -120,9 +127,23 @@ async def test_collect_respects_since_param():
     async for doc in source.collect(make_person_source(), since=since):
         yielded.append(doc)
 
+    assert client._iter_kwargs == {"reverse": True, "offset_date": since}
     assert len(yielded) == 2
-    assert yielded[0].published_at == datetime(2024, 8, 1, tzinfo=UTC)
-    assert yielded[1].published_at == datetime(2024, 7, 1, tzinfo=UTC)
+    assert yielded[0].published_at == datetime(2024, 7, 1, tzinfo=UTC)
+    assert yielded[1].published_at == datetime(2024, 8, 1, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_collect_passes_offset_date_none_when_since_not_set():
+    long_text = "А" * 100
+    msgs = [make_message(1, long_text, datetime(2024, 8, 1, tzinfo=UTC))]
+    client = make_mock_client(msgs)
+    source = TelegramSource(client)
+
+    async for _ in source.collect(make_person_source()):
+        pass
+
+    assert client._iter_kwargs == {"reverse": True, "offset_date": None}
 
 
 @pytest.mark.asyncio
