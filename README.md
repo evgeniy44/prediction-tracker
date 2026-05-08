@@ -48,6 +48,38 @@ docker compose up -d
 docker compose down             # data preserved in pgdata volume
 ```
 
+### Integration smoke (real services)
+
+Manual smoke script validates real Postgres + Telegram + Gemini + OpenAI integration end-to-end. Hits real APIs (~$0.001-0.005 per run depending on `--limit`).
+
+**Prereqs (in addition to Local development setup):**
+- `.env` filled з real API keys: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `LLM_API_KEY`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`
+- Telethon `tg_session` file existing (run `python -m prophet_checker` once interactively to auth)
+- `docker compose up -d` running, `alembic upgrade head` applied
+
+**Usage:**
+```bash
+# Cheap diagnostic — single component, often $0
+.venv/bin/python scripts/integration_smoke.py --channel @arestovich --limit 1 --component postgres
+.venv/bin/python scripts/integration_smoke.py --channel @arestovich --limit 1 --component gemini
+
+# Full smoke — all 5 stages sequentially (~$0.001-0.005)
+.venv/bin/python scripts/integration_smoke.py --channel @arestovich --limit 1
+
+# Bulk-load full channel history
+.venv/bin/python scripts/integration_smoke.py --channel @arestovich --limit 99999
+
+# Reset smoke data + rerun
+.venv/bin/python scripts/integration_smoke.py --channel @arestovich --limit 1 --reset-db
+
+# Don't halt on first fail — collect all errors
+.venv/bin/python scripts/integration_smoke.py --channel @arestovich --limit 1 --keep-going
+```
+
+**Stages:** `postgres` → `telegram` → `gemini` → `openai` → `e2e`. Use `--component STAGE` to run one stage in isolation.
+
+Output: each stage prints `[N/5] stage ... ✓/✗ (Xs)  msg`. Exit code 0 on full pass, 1 on any fail.
+
 ## Status
 
 Under development
