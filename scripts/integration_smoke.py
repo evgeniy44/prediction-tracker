@@ -10,9 +10,21 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from telethon import TelegramClient
 
 from prophet_checker.config import Settings
+from prophet_checker.llm import EmbeddingClient, LLMClient
+from prophet_checker.llm.prompts import (
+    EXTRACTION_SYSTEM,
+    build_extraction_prompt,
+    parse_extraction_response,
+)
 
 
 EXPECTED_ALEMBIC_HEAD = "edb2e385f26b"
+
+SAMPLE_TEXT = (
+    "15 жовтня закінчиться війна, до Києва прибуде делегація НАТО "
+    "з гарантіями безпеки до кінця року."
+)
+SAMPLE_CLAIM = "Контрнаступ почнеться влітку 2024 року"
 
 
 CHECKS = ["postgres", "telegram", "gemini", "openai", "e2e"]
@@ -92,6 +104,24 @@ async def check_telegram(settings: Settings, channel: str) -> tuple[bool, str]:
         await client.disconnect()
 
 
+async def check_gemini(settings: Settings) -> tuple[bool, str]:
+    llm = LLMClient(
+        provider=settings.llm_provider,
+        model=settings.llm_model,
+        api_key=settings.llm_api_key,
+    )
+    prompt = build_extraction_prompt(
+        text=SAMPLE_TEXT,
+        person_name="smoke-test-author",
+        published_date="2024-09-01",
+    )
+    response = await llm.complete(prompt, system=EXTRACTION_SYSTEM)
+    parsed = parse_extraction_response(response)
+    if not isinstance(parsed, list):
+        return False, f"parsed response is {type(parsed).__name__}, expected list"
+    return True, f"response parsed to list[{len(parsed)} predictions]"
+
+
 async def main() -> int:
     args = parse_args()
     settings = Settings()
@@ -116,6 +146,17 @@ async def main() -> int:
         print(f"[2/5] telegram ... {marker} ({elapsed:.2f}s)  {msg}")
         if not ok:
             failures.append("telegram")
+            if not args.keep_going:
+                return 1
+
+    if args.component in (None, "gemini"):
+        t0 = time.perf_counter()
+        ok, msg = await check_gemini(settings)
+        elapsed = time.perf_counter() - t0
+        marker = "✓" if ok else "✗"
+        print(f"[3/5] gemini ... {marker} ({elapsed:.2f}s)  {msg}")
+        if not ok:
+            failures.append("gemini")
             if not args.keep_going:
                 return 1
 
