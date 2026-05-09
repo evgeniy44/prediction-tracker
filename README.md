@@ -80,6 +80,26 @@ Manual smoke script validates real Postgres + Telegram + Gemini + OpenAI integra
 
 Output: each stage prints `[N/5] stage ... ✓/✗ (Xs)  msg`. Exit code 0 on full pass, 1 on any fail.
 
+## Tests
+
+Unit + integration tests use in-memory fakes (`FakeSourceRepo`, `FakePredictionRepo`) — no Docker / network required.
+
+```bash
+# Full suite
+.venv/bin/python -m pytest tests/ -q
+
+# Specific file
+.venv/bin/python -m pytest tests/test_ingestion_orchestrator.py -v
+
+# Single test
+.venv/bin/python -m pytest tests/test_ingestion_orchestrator.py::test_run_cycle_no_active_sources -v
+
+# With coverage
+.venv/bin/python -m pytest tests/ --cov=prophet_checker --cov-report=term-missing
+```
+
+For real-services validation (Postgres + Telegram + LLM APIs) see "Integration smoke" section above.
+
 ## Status
 
 Under development
