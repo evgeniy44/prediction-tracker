@@ -9,7 +9,7 @@ from prophet_checker.llm.embedding import EmbeddingClient
 async def test_embedding_client_default_model():
     client = EmbeddingClient(api_key="test-key")
     mock_response = AsyncMock()
-    mock_response.data = [AsyncMock(embedding=[0.1, 0.2, 0.3])]
+    mock_response.data = [{"embedding": [0.1, 0.2, 0.3]}]
 
     with patch("prophet_checker.llm.embedding.aembedding", return_value=mock_response) as mock_call:
         result = await client.embed("Test text")

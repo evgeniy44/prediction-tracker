@@ -21,4 +21,4 @@ class EmbeddingClient:
             api_key=self._api_key,
             num_retries=self._num_retries,
         )
-        return response.data[0].embedding
+        return response.data[0].get("embedding")
