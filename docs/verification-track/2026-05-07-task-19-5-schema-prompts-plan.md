@@ -1350,7 +1350,7 @@ Expected: 6 task commits (V1 delete → domain → DB → mappers → V2 prompts
 ## Cross-references
 
 - **Spec:** [`2026-05-07-task-19-5-schema-prompts-design.md`](2026-05-07-task-19-5-schema-prompts-design.md)
-- **Authoritative v2 design:** [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md)
+- **Authoritative v2 design:** [`2026-04-26-verification-trigger-policy-design.md`](../verifier-v2/2026-04-26-verification-trigger-policy-design.md)
 - **Decomposition:** [`2026-05-07-verifier-v2-decomposition.md`](2026-05-07-verifier-v2-decomposition.md)
 - **Pattern source (clean delete V1):** [`../ingestion-to-aws/2026-05-01-llm-client-split-design.md`](../ingestion-to-aws/2026-05-01-llm-client-split-design.md)
 - **Pattern source (migration):** [`../ingestion-to-aws/2026-05-07-docker-compose-design.md`](../ingestion-to-aws/2026-05-07-docker-compose-design.md)

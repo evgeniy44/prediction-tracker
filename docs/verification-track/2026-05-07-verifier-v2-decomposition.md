@@ -1,8 +1,8 @@
 # Verifier v2 — Implementation Decomposition
 
 **Status:** Active strategy doc 2026-05-07
-**Supersedes:** [`2026-04-29-verification-trigger-policy-plan.md`](2026-04-29-verification-trigger-policy-plan.md) (64KB monolith — predates Task 15-19 patterns)
-**Authoritative spec (still valid):** [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md)
+**Supersedes:** [`2026-04-29-verification-trigger-policy-plan.md`](../verifier-v2/2026-04-29-verification-trigger-policy-plan.md) (64KB monolith — predates Task 15-19 patterns)
+**Authoritative spec (still valid):** [`2026-04-26-verification-trigger-policy-design.md`](../verifier-v2/2026-04-26-verification-trigger-policy-design.md)
 
 ---
 
@@ -183,10 +183,10 @@ Original 2026-04-29 plan — один monolithic 9-task block з ~30 tests. Deco
 
 ## Cross-references
 
-- **Authoritative design (still valid):** [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md)
-- **Superseded plan:** [`2026-04-29-verification-trigger-policy-plan.md`](2026-04-29-verification-trigger-policy-plan.md)
-- **Lifecycle reference:** [`2026-04-29-prediction-lifecycle.md`](2026-04-29-prediction-lifecycle.md)
-- **Cycle reference:** [`2026-04-29-verification-cycle.md`](2026-04-29-verification-cycle.md)
-- **Single call reference:** [`2026-04-29-verifier-v2-call.md`](2026-04-29-verifier-v2-call.md)
+- **Authoritative design (still valid):** [`2026-04-26-verification-trigger-policy-design.md`](../verifier-v2/2026-04-26-verification-trigger-policy-design.md)
+- **Superseded plan:** [`2026-04-29-verification-trigger-policy-plan.md`](../verifier-v2/2026-04-29-verification-trigger-policy-plan.md)
+- **Lifecycle reference:** [`2026-04-29-prediction-lifecycle.md`](../verifier-v2/2026-04-29-prediction-lifecycle.md)
+- **Cycle reference:** [`2026-04-29-verification-cycle.md`](../verifier-v2/2026-04-29-verification-cycle.md)
+- **Single call reference:** [`2026-04-29-verifier-v2-call.md`](../verifier-v2/2026-04-29-verifier-v2-call.md)
 - **Pattern source (orchestrator):** [`../ingestion-to-aws/2026-05-01-ingestion-orchestrator-design.md`](../ingestion-to-aws/2026-05-01-ingestion-orchestrator-design.md)
 - **Pattern source (eval):** [`../architecture/2026-04-26-flow-4-extraction-quality-eval.md`](../architecture/2026-04-26-flow-4-extraction-quality-eval.md)

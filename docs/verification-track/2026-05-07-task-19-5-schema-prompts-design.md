@@ -5,7 +5,7 @@
 **Prerequisites:** ✅ Task 17 (baseline migration `edb2e385f26b`)
 **Next:** Task 19.7 (verification model evaluation), потім Task 20 (orchestrator)
 
-**Authoritative spec (still valid):** [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md)
+**Authoritative spec (still valid):** [`2026-04-26-verification-trigger-policy-design.md`](../verifier-v2/2026-04-26-verification-trigger-policy-design.md)
 **Decomposition strategy:** [`2026-05-07-verifier-v2-decomposition.md`](2026-05-07-verifier-v2-decomposition.md)
 
 ---
@@ -87,7 +87,7 @@ Approach: Alembic `--autogenerate` initial scaffold + manual edits для `serve
 
 ### `VERIFICATION_SYSTEM_V2`
 
-Per spec [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md), section "Verification prompt v2", з ОДИНОЮ зміною:
+Per spec [`2026-04-26-verification-trigger-policy-design.md`](../verifier-v2/2026-04-26-verification-trigger-policy-design.md), section "Verification prompt v2", з ОДИНОЮ зміною:
 
 > **Original spec:** `"evidence": "concrete fact / URL or null"`
 > **V2 final:** `"evidence": "concrete fact text or null. Do NOT include URLs (you have no web access)."`
@@ -223,9 +223,9 @@ Expected: predictions table має 6 нових columns + index `idx_predictions
 
 ## Cross-references
 
-- **Authoritative spec:** [`2026-04-26-verification-trigger-policy-design.md`](2026-04-26-verification-trigger-policy-design.md)
+- **Authoritative spec:** [`2026-04-26-verification-trigger-policy-design.md`](../verifier-v2/2026-04-26-verification-trigger-policy-design.md)
 - **Decomposition strategy:** [`2026-05-07-verifier-v2-decomposition.md`](2026-05-07-verifier-v2-decomposition.md)
-- **Lifecycle reference:** [`2026-04-29-prediction-lifecycle.md`](2026-04-29-prediction-lifecycle.md)
-- **Cycle reference:** [`2026-04-29-verification-cycle.md`](2026-04-29-verification-cycle.md)
+- **Lifecycle reference:** [`2026-04-29-prediction-lifecycle.md`](../verifier-v2/2026-04-29-prediction-lifecycle.md)
+- **Cycle reference:** [`2026-04-29-verification-cycle.md`](../verifier-v2/2026-04-29-verification-cycle.md)
 - **Pattern source (migration):** [`../ingestion-to-aws/2026-05-07-docker-compose-design.md`](../ingestion-to-aws/2026-05-07-docker-compose-design.md) (baseline `edb2e385f26b`)
 - **Pattern source (V1 → V2 cleanup):** [`../ingestion-to-aws/2026-05-01-llm-client-split-design.md`](../ingestion-to-aws/2026-05-01-llm-client-split-design.md) (clean delete pattern)
