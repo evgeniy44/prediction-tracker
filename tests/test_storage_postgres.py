@@ -59,3 +59,61 @@ def test_prediction_round_trip():
     result = prediction_db_to_domain(db_obj)
     assert result.status == PredictionStatus.CONFIRMED
     assert result.evidence_url == "https://news.com/proof"
+
+
+def test_domain_to_prediction_db_includes_v2_fields():
+    from datetime import UTC, date, datetime
+    from prophet_checker.models.domain import Prediction, PredictionStatus, PredictionStrength
+    from prophet_checker.storage.postgres import domain_to_prediction_db
+
+    pred = Prediction(
+        id="p1",
+        document_id="d1",
+        person_id="per1",
+        claim_text="Test claim",
+        prediction_date=date(2024, 1, 1),
+        prediction_strength=PredictionStrength.HIGH,
+        max_horizon=date(2025, 1, 1),
+        next_check_at=date(2024, 6, 1),
+        verify_attempts=3,
+        last_verify_error="ValueError: invalid status",
+        last_verify_error_at=datetime(2024, 5, 1, tzinfo=UTC),
+    )
+    db_obj = domain_to_prediction_db(pred)
+    assert db_obj.prediction_strength == "high"
+    assert db_obj.max_horizon == date(2025, 1, 1)
+    assert db_obj.next_check_at == date(2024, 6, 1)
+    assert db_obj.verify_attempts == 3
+    assert db_obj.last_verify_error == "ValueError: invalid status"
+    assert db_obj.last_verify_error_at == datetime(2024, 5, 1, tzinfo=UTC)
+
+
+def test_prediction_db_to_domain_includes_v2_fields():
+    from datetime import UTC, date, datetime
+    from prophet_checker.models.db import PredictionDB
+    from prophet_checker.models.domain import PredictionStrength
+    from prophet_checker.storage.postgres import prediction_db_to_domain
+
+    db = PredictionDB(
+        id="p1",
+        document_id="d1",
+        person_id="per1",
+        claim_text="Test claim",
+        prediction_date=date(2024, 1, 1),
+        topic="test topic",
+        status="unresolved",
+        confidence=0.0,
+        prediction_strength="medium",
+        max_horizon=date(2025, 1, 1),
+        next_check_at=date(2024, 6, 1),
+        verify_attempts=2,
+        last_verify_error="JSONDecodeError",
+        last_verify_error_at=datetime(2024, 5, 1, tzinfo=UTC),
+    )
+    pred = prediction_db_to_domain(db)
+    assert pred.prediction_strength == PredictionStrength.MEDIUM
+    assert pred.max_horizon == date(2025, 1, 1)
+    assert pred.next_check_at == date(2024, 6, 1)
+    assert pred.verify_attempts == 2
+    assert pred.last_verify_error == "JSONDecodeError"
+    assert pred.last_verify_error_at == datetime(2024, 5, 1, tzinfo=UTC)

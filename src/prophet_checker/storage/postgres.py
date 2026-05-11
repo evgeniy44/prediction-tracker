@@ -12,7 +12,7 @@ from prophet_checker.models.db import (
     PersonDB, PersonSourceDB, PredictionDB, RawDocumentDB,
 )
 from prophet_checker.models.domain import (
-    Person, PersonSource, Prediction, PredictionStatus, RawDocument, SourceType,
+    Person, PersonSource, Prediction, PredictionStatus, PredictionStrength, RawDocument, SourceType,
 )
 
 
@@ -69,6 +69,12 @@ def domain_to_prediction_db(pred: Prediction) -> PredictionDB:
         status=pred.status.value, confidence=pred.confidence,
         evidence_url=pred.evidence_url, evidence_text=pred.evidence_text,
         verified_at=pred.verified_at, embedding=pred.embedding,
+        prediction_strength=pred.prediction_strength.value if pred.prediction_strength else None,
+        max_horizon=pred.max_horizon,
+        next_check_at=pred.next_check_at,
+        verify_attempts=pred.verify_attempts,
+        last_verify_error=pred.last_verify_error,
+        last_verify_error_at=pred.last_verify_error_at,
     )
 
 
@@ -80,6 +86,12 @@ def prediction_db_to_domain(db: PredictionDB) -> Prediction:
         status=PredictionStatus(db.status), confidence=db.confidence,
         evidence_url=db.evidence_url, evidence_text=db.evidence_text,
         verified_at=db.verified_at,
+        prediction_strength=PredictionStrength(db.prediction_strength) if db.prediction_strength else None,
+        max_horizon=db.max_horizon,
+        next_check_at=db.next_check_at,
+        verify_attempts=db.verify_attempts,
+        last_verify_error=db.last_verify_error,
+        last_verify_error_at=db.last_verify_error_at,
     )
 
 
