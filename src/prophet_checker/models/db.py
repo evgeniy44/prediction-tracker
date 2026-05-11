@@ -10,9 +10,12 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
+    Integer,
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -81,7 +84,19 @@ class PredictionDB(Base):
     evidence_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     evidence_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    embedding = mapped_column(Vector(1536), nullable=True)  # pgvector: 1536 dims = text-embedding-3-small
+    embedding = mapped_column(Vector(1536), nullable=True)
+    prediction_strength: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    max_horizon: Mapped[date | None] = mapped_column(Date, nullable=True)
+    next_check_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    verify_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default=text("0")
+    )
+    last_verify_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_verify_error_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     document: Mapped[RawDocumentDB] = relationship(back_populates="predictions")
     person: Mapped[PersonDB] = relationship(back_populates="predictions")
+
+    __table_args__ = (
+        Index("idx_predictions_eligible", "verified_at", "next_check_at", "max_horizon"),
+    )
