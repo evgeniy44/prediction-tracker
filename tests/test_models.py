@@ -94,3 +94,28 @@ def test_person_source_explicit_last_collected_at_preserved():
         last_collected_at=explicit,
     )
     assert ps.last_collected_at == explicit
+
+
+def test_prediction_strength_enum_values():
+    from prophet_checker.models.domain import PredictionStrength
+    assert PredictionStrength.LOW.value == "low"
+    assert PredictionStrength.MEDIUM.value == "medium"
+    assert PredictionStrength.HIGH.value == "high"
+
+
+def test_prediction_has_v2_verification_field_defaults():
+    from datetime import date
+    from prophet_checker.models.domain import Prediction
+    pred = Prediction(
+        id="p1",
+        document_id="d1",
+        person_id="per1",
+        claim_text="Test claim",
+        prediction_date=date(2024, 1, 1),
+    )
+    assert pred.prediction_strength is None
+    assert pred.max_horizon is None
+    assert pred.next_check_at is None
+    assert pred.verify_attempts == 0
+    assert pred.last_verify_error is None
+    assert pred.last_verify_error_at is None

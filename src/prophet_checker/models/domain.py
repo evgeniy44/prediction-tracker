@@ -17,6 +17,12 @@ class PredictionStatus(str, Enum):
     UNRESOLVED = "unresolved"
 
 
+class PredictionStrength(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 class Person(BaseModel):
     id: str
     name: str
@@ -70,3 +76,9 @@ class Prediction(BaseModel):
     evidence_text: str | None = None
     verified_at: datetime | None = None
     embedding: list[float] | None = None
+    prediction_strength: PredictionStrength | None = None
+    max_horizon: date | None = None
+    next_check_at: date | None = None
+    verify_attempts: int = 0
+    last_verify_error: str | None = None
+    last_verify_error_at: datetime | None = None
