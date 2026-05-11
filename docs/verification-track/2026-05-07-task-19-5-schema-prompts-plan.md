@@ -373,7 +373,7 @@ class PredictionDB(Base):
     max_horizon: Mapped[date | None] = mapped_column(Date, nullable=True)
     next_check_at: Mapped[date | None] = mapped_column(Date, nullable=True)
     verify_attempts: Mapped[int] = mapped_column(
-        Integer, default=0, nullable=False, server_default=func.now() and "0"
+        Integer, default=0, nullable=False, server_default=text("0")
     )
     last_verify_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_verify_error_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -386,15 +386,7 @@ class PredictionDB(Base):
     )
 ```
 
-**Note:** `verify_attempts` server_default — використовуємо raw text:
-
-Replace `server_default=func.now() and "0"` rouge expression з clean SQL text:
-
-```python
-    verify_attempts: Mapped[int] = mapped_column(
-        Integer, default=0, nullable=False, server_default=text("0")
-    )
-```
+`server_default=text("0")` — SQL-level default `DEFAULT 0` для ALTER TABLE на existing rows (без нього `NOT NULL` constraint буде fail на backfill). `default=0` paired — Python-side для ORM instantiation.
 
 Add `Integer`, `Index`, `text` to existing imports at top of `db.py`. Find existing import line:
 
@@ -654,10 +646,10 @@ and global events. Today's date is {today}. The prediction was made on a past
 date — your job is to assess whether it can be evaluated NOW, and if so, what
 the verdict is.
 
-Determine FOUR outputs:
+Determine SEVEN outputs (all required in JSON response):
 
 ═══════════════════════════════════════════════════════════════════
-1) STATUS — exactly one of:
+1) status — exactly one of:
 
    "confirmed" — the predicted event happened as foretold. You have
                 concrete evidence. The prediction's timeframe (target_date,
@@ -676,20 +668,34 @@ Determine FOUR outputs:
                  condition (for conditional predictions like "if X happens")
                  hasn't fired. We should retry verification later.
 
-═══════════════════════════════════════════════════════════════════
-2) PREDICTION_STRENGTH — assess the CLAIM ITSELF (independent of outcome):
+2) confidence — 0.0 to 1.0
+   Your certainty in the verdict.
+
+3) prediction_strength — assess the CLAIM ITSELF (independent of outcome):
 
    "high"   — concrete falsifiable claim with measurable outcome.
    "medium" — probabilistic but substantive claim with clear outcome.
    "low"    — vague hedge, possibility statement, or non-substantive forecast.
 
-═══════════════════════════════════════════════════════════════════
-3) MAX_HORIZON — latest reasonable date to keep checking this prediction.
-   Set ONLY if status="premature" AND target_date is null. Otherwise null.
+4) reasoning — 1-3 sentences
+   Explain the verdict and strength assessment.
 
-═══════════════════════════════════════════════════════════════════
-4) RETRY_AFTER — only when status="premature". When does it make sense to
-   re-evaluate?
+5) evidence — concrete fact text or null
+   REQUIRED when status=confirmed/refuted (verdict needs justification).
+   May be null when status=premature/unresolved.
+   Do NOT include URLs (you have no web access).
+
+6) retry_after — YYYY-MM-DD or null
+   REQUIRED when status=premature. Null for all other statuses.
+   Heuristics: for conditional predictions today + 3-6 months;
+   for target_date in future, use target_date itself;
+   for vague open-ended, today + 6 months.
+
+7) max_horizon — YYYY-MM-DD or null
+   Latest reasonable date to keep checking this prediction.
+   Set ONLY if status="premature" AND target_date is null. Otherwise null.
+   Heuristics: conditional ~3 years; open-ended political ~5 years;
+   "soon"/"coming months" → prediction_date + 1-2 years.
 
 ═══════════════════════════════════════════════════════════════════
 MUTUAL EXCLUSION RULES (strictly enforce):

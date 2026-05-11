@@ -87,12 +87,19 @@ Approach: Alembic `--autogenerate` initial scaffold + manual edits для `serve
 
 ### `VERIFICATION_SYSTEM_V2`
 
-Per spec [`2026-04-26-verification-trigger-policy-design.md`](../verifier-v2/2026-04-26-verification-trigger-policy-design.md), section "Verification prompt v2", з ОДИНОЮ зміною:
+Per spec [`2026-04-26-verification-trigger-policy-design.md`](../verifier-v2/2026-04-26-verification-trigger-policy-design.md), section "Verification prompt v2", з ДВОМА змінами:
 
-> **Original spec:** `"evidence": "concrete fact / URL or null"`
-> **V2 final:** `"evidence": "concrete fact text or null. Do NOT include URLs (you have no web access)."`
+> **Change 1 (evidence text-only):**
+> Original spec: `"evidence": "concrete fact / URL or null"`
+> V2 final: `"evidence": "concrete fact text or null. Do NOT include URLs (you have no web access)."`
+
+> **Change 2 (numbered outputs framing):**
+> Original spec: `"Determine FOUR outputs:"` (instructional sections — confusing because JSON returns 7 fields)
+> V2 final: `"Determine SEVEN outputs (all required in JSON response):"` listing all 7 fields explicitly з detailed rubric для кожного. Це prevents LLM-only-outputs-numbered-fields scenario що тригерить parser hard-rejects.
 
 Includes `{today}` placeholder — formatted via `get_verification_system_v2(today)`.
+
+Full prompt text — у plan slice 5a Step 1.
 
 ### `VERIFICATION_TEMPLATE_V2`
 
