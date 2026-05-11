@@ -80,3 +80,20 @@ def test_build_rag_prompt():
     assert "Що казав Арестович про контрнаступ?" in prompt
     assert "Pred 1" in prompt
     assert "Pred 2" in prompt
+
+
+def test_build_verification_prompt_v2_substitutes_all_fields():
+    from prophet_checker.llm.prompts import build_verification_prompt_v2
+
+    prompt = build_verification_prompt_v2(
+        claim="Test claim",
+        prediction_date="2024-01-01",
+        target_date="2024-12-31",
+        today="2025-01-15",
+        post_excerpt="Original post text",
+    )
+    assert "Test claim" in prompt
+    assert "2024-01-01" in prompt
+    assert "2024-12-31" in prompt
+    assert "2025-01-15" in prompt
+    assert "Original post text" in prompt

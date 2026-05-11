@@ -106,6 +106,96 @@ Based on this data, answer the user's question. Include:
 - Disclaimer about automated analysis"""
 
 
+VERIFICATION_SYSTEM_V2 = """You are a fact-checker who verifies political/economic predictions about Ukraine
+and global events. Today's date is {today}. The prediction was made on a past
+date — your job is to assess whether it can be evaluated NOW, and if so, what
+the verdict is.
+
+Determine SEVEN outputs (all required in JSON response):
+
+═══════════════════════════════════════════════════════════════════
+1) status — exactly one of:
+
+   "confirmed" — the predicted event happened as foretold. You have
+                concrete evidence. The prediction's timeframe (target_date,
+                or reasonable interpretation) has passed.
+
+   "refuted"  — the predicted event did NOT happen, OR the opposite occurred.
+                Concrete evidence required. Timeframe has passed.
+
+   "unresolved" — the predicted event's timeframe has passed, but evidence is
+                  ambiguous, the claim is too vague to falsify, or no public
+                  record exists. Re-checking later WON'T help — this is a
+                  permanent verdict.
+
+   "premature" — the predicted event has not yet occurred but is still
+                 POSSIBLE. The timeframe hasn't elapsed, OR the trigger
+                 condition (for conditional predictions like "if X happens")
+                 hasn't fired. We should retry verification later.
+
+2) confidence — 0.0 to 1.0
+   Your certainty in the verdict.
+
+3) prediction_strength — assess the CLAIM ITSELF (independent of outcome):
+
+   "high"   — concrete falsifiable claim with measurable outcome.
+   "medium" — probabilistic but substantive claim with clear outcome.
+   "low"    — vague hedge, possibility statement, or non-substantive forecast.
+
+4) reasoning — 1-3 sentences
+   Explain the verdict and strength assessment.
+
+5) evidence — concrete fact text or null
+   REQUIRED when status=confirmed/refuted (verdict needs justification).
+   May be null when status=premature/unresolved.
+   Do NOT include URLs (you have no web access).
+
+6) retry_after — YYYY-MM-DD or null
+   REQUIRED when status=premature. Null for all other statuses.
+   Heuristics: for conditional predictions today + 3-6 months;
+   for target_date in future, use target_date itself;
+   for vague open-ended, today + 6 months.
+
+7) max_horizon — YYYY-MM-DD or null
+   Latest reasonable date to keep checking this prediction.
+   Set ONLY if status="premature" AND target_date is null. Otherwise null.
+   Heuristics: conditional ~3 years; open-ended political ~5 years;
+   "soon"/"coming months" → prediction_date + 1-2 years.
+
+═══════════════════════════════════════════════════════════════════
+MUTUAL EXCLUSION RULES (strictly enforce):
+- status=confirmed/refuted → evidence MUST be a concrete fact, retry_after=null
+- status=unresolved → retry_after=null (recheck won't help)
+- status=premature → retry_after MUST be a date, evidence may be null
+- max_horizon set ONLY when status=premature AND target_date=null
+
+Respond ONLY with raw JSON, no markdown fences:
+
+{{
+  "status": "confirmed" | "refuted" | "unresolved" | "premature",
+  "confidence": 0.0 to 1.0,
+  "prediction_strength": "low" | "medium" | "high",
+  "reasoning": "1-3 sentences explaining the verdict and strength",
+  "evidence": "concrete fact text or null. Do NOT include URLs (you have no web access).",
+  "retry_after": "YYYY-MM-DD or null",
+  "max_horizon": "YYYY-MM-DD or null"
+}}"""
+
+
+VERIFICATION_TEMPLATE_V2 = """Claim: "{claim}"
+Made on: {prediction_date}
+Expected by: {target_date}
+
+Original post excerpt (for context):
+---
+{post_excerpt}
+---
+
+Today: {today}.
+
+Provide your verdict per the rubric."""
+
+
 def build_extraction_prompt(text: str, person_name: str, published_date: str) -> str:
     return EXTRACTION_TEMPLATE.format(
         text=text, person_name=person_name, published_date=published_date,
@@ -118,6 +208,26 @@ def build_rag_prompt(question: str, predictions_context: list[dict]) -> str:
         for p in predictions_context
     )
     return RAG_TEMPLATE.format(question=question, predictions_context=context_str)
+
+
+def build_verification_prompt_v2(
+    claim: str,
+    prediction_date: str,
+    target_date: str | None,
+    today: str,
+    post_excerpt: str,
+) -> str:
+    return VERIFICATION_TEMPLATE_V2.format(
+        claim=claim,
+        prediction_date=prediction_date,
+        target_date=target_date or "not specified",
+        today=today,
+        post_excerpt=post_excerpt,
+    )
+
+
+def get_verification_system_v2(today: str) -> str:
+    return VERIFICATION_SYSTEM_V2.format(today=today)
 
 
 def parse_extraction_response(response: str) -> list[dict]:
