@@ -119,3 +119,23 @@ def test_prediction_has_v2_verification_field_defaults():
     assert pred.verify_attempts == 0
     assert pred.last_verify_error is None
     assert pred.last_verify_error_at is None
+
+
+def test_prediction_value_enum_values():
+    from prophet_checker.models.domain import PredictionValue
+    assert PredictionValue.LOW.value == "low"
+    assert PredictionValue.MEDIUM.value == "medium"
+    assert PredictionValue.HIGH.value == "high"
+
+
+def test_prediction_has_value_field_default():
+    from datetime import date
+    from prophet_checker.models.domain import Prediction
+    pred = Prediction(
+        id="p1",
+        document_id="d1",
+        person_id="per1",
+        claim_text="Test",
+        prediction_date=date(2024, 1, 1),
+    )
+    assert pred.prediction_value is None
