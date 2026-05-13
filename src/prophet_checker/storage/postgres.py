@@ -12,7 +12,7 @@ from prophet_checker.models.db import (
     PersonDB, PersonSourceDB, PredictionDB, RawDocumentDB,
 )
 from prophet_checker.models.domain import (
-    Person, PersonSource, Prediction, PredictionStatus, PredictionStrength, RawDocument, SourceType,
+    Person, PersonSource, Prediction, PredictionStatus, PredictionStrength, PredictionValue, RawDocument, SourceType,
 )
 
 
@@ -70,6 +70,7 @@ def domain_to_prediction_db(pred: Prediction) -> PredictionDB:
         evidence_url=pred.evidence_url, evidence_text=pred.evidence_text,
         verified_at=pred.verified_at, embedding=pred.embedding,
         prediction_strength=pred.prediction_strength.value if pred.prediction_strength else None,
+        prediction_value=pred.prediction_value.value if pred.prediction_value else None,
         max_horizon=pred.max_horizon,
         next_check_at=pred.next_check_at,
         verify_attempts=pred.verify_attempts,
@@ -87,6 +88,7 @@ def prediction_db_to_domain(db: PredictionDB) -> Prediction:
         evidence_url=db.evidence_url, evidence_text=db.evidence_text,
         verified_at=db.verified_at,
         prediction_strength=PredictionStrength(db.prediction_strength) if db.prediction_strength else None,
+        prediction_value=PredictionValue(db.prediction_value) if db.prediction_value else None,
         max_horizon=db.max_horizon,
         next_check_at=db.next_check_at,
         verify_attempts=db.verify_attempts,

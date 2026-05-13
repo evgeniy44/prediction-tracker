@@ -117,3 +117,34 @@ def test_prediction_db_to_domain_includes_v2_fields():
     assert pred.verify_attempts == 2
     assert pred.last_verify_error == "JSONDecodeError"
     assert pred.last_verify_error_at == datetime(2024, 5, 1, tzinfo=UTC)
+
+
+def test_domain_to_prediction_db_includes_prediction_value():
+    from datetime import date
+    from prophet_checker.models.domain import Prediction, PredictionValue
+    from prophet_checker.storage.postgres import domain_to_prediction_db
+
+    pred = Prediction(
+        id="p1", document_id="d1", person_id="per1",
+        claim_text="Test", prediction_date=date(2024, 1, 1),
+        prediction_value=PredictionValue.HIGH,
+    )
+    db_obj = domain_to_prediction_db(pred)
+    assert db_obj.prediction_value == "high"
+
+
+def test_prediction_db_to_domain_includes_prediction_value():
+    from datetime import date
+    from prophet_checker.models.db import PredictionDB
+    from prophet_checker.models.domain import PredictionValue
+    from prophet_checker.storage.postgres import prediction_db_to_domain
+
+    db = PredictionDB(
+        id="p1", document_id="d1", person_id="per1",
+        claim_text="Test", prediction_date=date(2024, 1, 1),
+        topic="", status="unresolved", confidence=0.0,
+        verify_attempts=0,
+        prediction_value="medium",
+    )
+    pred = prediction_db_to_domain(db)
+    assert pred.prediction_value == PredictionValue.MEDIUM
