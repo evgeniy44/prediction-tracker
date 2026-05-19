@@ -76,6 +76,7 @@ class PredictionDB(Base):
     document_id: Mapped[str] = mapped_column(ForeignKey("raw_documents.id"), nullable=False)
     person_id: Mapped[str] = mapped_column(ForeignKey("persons.id"), nullable=False)
     claim_text: Mapped[str] = mapped_column(Text, nullable=False)
+    context: Mapped[str | None] = mapped_column(Text, nullable=True)
     prediction_date: Mapped[date] = mapped_column(Date, nullable=False)
     target_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     topic: Mapped[str] = mapped_column(String(100), default="")
