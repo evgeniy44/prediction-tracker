@@ -148,3 +148,33 @@ def test_prediction_db_to_domain_includes_prediction_value():
     )
     pred = prediction_db_to_domain(db)
     assert pred.prediction_value == PredictionValue.MEDIUM
+
+
+def test_domain_to_prediction_db_includes_context():
+    from datetime import date
+    from prophet_checker.models.domain import Prediction
+    from prophet_checker.storage.postgres import domain_to_prediction_db
+
+    pred = Prediction(
+        id="p1", document_id="d1", person_id="per1",
+        claim_text="Test", prediction_date=date(2024, 1, 1),
+        context="Verbatim quote from post",
+    )
+    db_obj = domain_to_prediction_db(pred)
+    assert db_obj.context == "Verbatim quote from post"
+
+
+def test_prediction_db_to_domain_includes_context():
+    from datetime import date
+    from prophet_checker.models.db import PredictionDB
+    from prophet_checker.storage.postgres import prediction_db_to_domain
+
+    db = PredictionDB(
+        id="p1", document_id="d1", person_id="per1",
+        claim_text="Test", prediction_date=date(2024, 1, 1),
+        topic="", status="unresolved", confidence=0.0,
+        verify_attempts=0,
+        context="Verbatim quote from post",
+    )
+    pred = prediction_db_to_domain(db)
+    assert pred.context == "Verbatim quote from post"
