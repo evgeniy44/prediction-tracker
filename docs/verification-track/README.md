@@ -1,7 +1,7 @@
 # Verifier-v2 — Project Status
 
 **Last updated:** 2026-05-14
-**You are here:** 🎯 Specs готові для 19.8a + 19.8b — чекаємо approve → writing-plans
+**You are here:** 🎯 19.8a IMPLEMENTED (7 commits, 150 tests pass) — далі 19.8b operational run
 
 ---
 
@@ -10,7 +10,7 @@
 - ✅ **Foundation (19.5)** — V2 schema + prompts + parser + tests. **Landed.**
 - ✅ **PredictionValue extension** — 8-й output verifier (importance/resonance). **Landed.**
 - ✅ **Gold v1 (19.7a)** — 35 Arestovich predictions, V2 schema **без context**. **Landed → стане `_legacy/` після 19.8b.**
-- 📋 **19.8a Design** — schema/prompt для нового `context` field. **Spec committed.**
+- ✅ **19.8a** — schema/prompt для нового `context` field. **Landed (7 commits, 150 tests pass).**
 - 📋 **19.8b Design** — V2 extraction re-run + quality re-eval + fresh gold v2. **Spec committed.**
 - 🔜 **19.7b** — Verification model eval (потребує fresh gold). **Brainstorm pending.**
 - 🔜 **Task 20** — VerificationOrchestrator + production wiring. **Pending all above.**
@@ -24,7 +24,7 @@ flowchart TD
     T195[("Task 19.5<br/>V2 foundations")]:::done
     PV[("PredictionValue<br/>extension")]:::done
     T197A[("Task 19.7a<br/>Gold v1")]:::done
-    T198A[("Task 19.8a<br/>Schema + prompt")]:::specReady
+    T198A[("Task 19.8a<br/>Schema + prompt")]:::done
     T198B[("Task 19.8b<br/>V2 run + quality + new gold")]:::specReady
     T197B[("Task 19.7b<br/>Verifier eval")]:::pending
     T20[("Task 20<br/>Orchestrator + wiring")]:::pending
@@ -99,21 +99,29 @@ flowchart TD
 
 ---
 
-### 📋 Task 19.8a — Extraction context field schema/prompt
+### ✅ Task 19.8a — Extraction context field schema/prompt
 **Спека:** `2026-05-14-task-19-8a-extraction-context-schema-design.md` (commit `e7e3e37`)
+**План:** `2026-05-14-task-19-8a-extraction-context-schema-plan.md` (commit `3ce7300`)
 **Goal:** Розширити extraction output полем `context` (verbatim quote ~300 chars з посту, що пояснює claim).
 
-**Зміни схеми:**
-- `Prediction.context: str | None`
-- `PredictionDB.context` column (Text, nullable)
-- `EXTRACTION_TEMPLATE` — нове JSON field
-- `build_verification_prompt_v2(..., context=...)` — параметр rename (post_excerpt → context)
-- New utility: `validate_context_in_post(context, raw_post)` — substring check з whitespace normalize
-- Alembic migration: `add_prediction_context` (down_revision `8df4e2013c5a`)
+**Зміни схеми (landed):**
+- `Prediction.context: str | None` ✅
+- `PredictionDB.context` column (Text, nullable) ✅
+- `EXTRACTION_TEMPLATE` — нове JSON field `context` ✅
+- `build_verification_prompt_v2(..., context=...)` — параметр rename (post_excerpt → context) ✅
+- New utility: `validate_context_in_post(context, raw_post)` — substring check з whitespace normalize ✅
+- Alembic migration: `add_prediction_context` revision `2c09afbbdcdf` (down_revision `8df4e2013c5a`) ✅
 
-**Tests delta:** +11 нових (139 → 150). 7 commits TDD.
+**Tests:** 150 passed (+11 нових з baseline 139).
 
-**Status:** Spec ready, implementation plan ще не написано.
+**Key commits:** `fe1f114` → `ef7f8f2` (7 commits, subagent-driven з 2-stage review)
+- `fe1f114` feat(models): додаю Prediction.context field для V2 extraction
+- `31d3246` feat(db): додаю context column на PredictionDB
+- `1404810` feat(storage): mapper round-trip context field
+- `6b6a414` feat(llm): validate_context_in_post substring validator з whitespace normalize
+- `7e5dc0a` feat(llm): EXTRACTION_TEMPLATE розширено context field
+- `ccad810` feat(llm): build_verification_prompt_v2 приймає context= замість post_excerpt=
+- `ef7f8f2` feat(db): alembic migration add_prediction_context column
 
 ---
 
