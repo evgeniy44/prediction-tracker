@@ -91,7 +91,7 @@ def test_build_verification_prompt_v2_substitutes_all_fields():
         prediction_date="2024-01-01",
         target_date="2024-12-31",
         today="2025-01-15",
-        post_excerpt="Original post text",
+        context="Original post text",
     )
     assert "Test claim" in prompt
     assert "2024-01-01" in prompt
@@ -324,3 +324,26 @@ def test_parse_extraction_response_extracts_context():
     predictions = parse_extraction_response(response)
     assert len(predictions) == 1
     assert predictions[0]["context"] == "Я думаю що війна закінчиться у 2026"
+
+
+def test_build_verification_prompt_v2_accepts_context_kwarg():
+    import pytest
+    from prophet_checker.llm.prompts import build_verification_prompt_v2
+
+    prompt = build_verification_prompt_v2(
+        claim="X",
+        prediction_date="2024-01-01",
+        target_date=None,
+        today="2026-05-14",
+        context="Verbatim quote",
+    )
+    assert "Verbatim quote" in prompt
+
+    with pytest.raises(TypeError):
+        build_verification_prompt_v2(
+            claim="X",
+            prediction_date="2024-01-01",
+            target_date=None,
+            today="2026-05-14",
+            post_excerpt="should fail under new signature",
+        )

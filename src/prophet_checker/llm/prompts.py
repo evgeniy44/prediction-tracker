@@ -235,14 +235,14 @@ def build_verification_prompt_v2(
     prediction_date: str,
     target_date: str | None,
     today: str,
-    post_excerpt: str,
+    context: str,
 ) -> str:
     return VERIFICATION_TEMPLATE_V2.format(
         claim=claim,
         prediction_date=prediction_date,
         target_date=target_date or "not specified",
         today=today,
-        post_excerpt=post_excerpt,
+        post_excerpt=context,
     )
 
 
