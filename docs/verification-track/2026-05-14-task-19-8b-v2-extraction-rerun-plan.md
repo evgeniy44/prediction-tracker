@@ -4,13 +4,15 @@
 
 **Goal:** Run V2 extraction prompt (з context field) через Gemini Flash Lite на 17 Arestovich постах, оцінити quality через Opus judge (Task 13.5 methodology), застосувати decision rule, і запустити inline re-labeling нового gold dataset для downstream Task 19.7b verification eval.
 
-**Architecture:** Two new standalone scripts (`v2_extraction_run.py`, `v2_quality_eval.py`) що reuse інфраструктуру з `evaluate_detection.py` + `extraction_quality_eval.py`. Extraction script bypass'ить `PredictionExtractor` і використовує `parse_extraction_response` напряму щоб дістати context field з parsed dict. Quality eval reuse'ить Task 13.5 judge prompts і aggregation pure functions. Re-labeling — inline chat manual phase (не код).
+**Architecture:** Two new standalone scripts (`v2_extraction_run.py`, `v2_quality_eval.py`) що reuse інфраструктуру з `evaluate_detection.py` + `extraction_quality_eval.py`. Extraction script використовує `PredictionExtractor` напряму (post-19.8c context wiring). Quality eval reuse'ить Task 13.5 judge prompts і aggregation pure functions. Re-labeling — inline chat manual phase (не код).
 
 **Tech Stack:** Python 3.12, asyncio, LiteLLM (via LLMClient), Anthropic Opus 4.6 (judge), Gemini Flash Lite (extractor). Working dir: `/Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker`. Use `.venv/bin/python`.
 
 **Spec:** [`2026-05-14-task-19-8b-v2-extraction-rerun-design.md`](2026-05-14-task-19-8b-v2-extraction-rerun-design.md)
 
 **Prerequisites:** ✅ Task 19.8a landed (commits `fe1f114..ef7f8f2`). `EXTRACTION_TEMPLATE` має context field; `validate_context_in_post` доступний у `prophet_checker.llm.prompts`.
+
+**Prerequisites (updated):** ✅ Task 19.8a + ✅ Task 19.8c (extractor context wiring). `PredictionExtractor.extract()` тепер повертає Prediction objects з validated context — Stage 1 використовує extractor напряму.
 
 ---
 
@@ -54,9 +56,12 @@
 - Create: `scripts/v2_extraction_run.py`
 - Create: `tests/test_v2_extraction_run.py`
 
-### Approach: bypass PredictionExtractor
+### Approach: use PredictionExtractor (post-19.8c)
 
-`PredictionExtractor.extract()` (production code) повертає `Prediction` Pydantic objects без `context` field (не оновлено в 19.8a — поза scope). Для 19.8b script ми викликаємо LLM напряму, parse'имо response, і працюємо з raw dict (де `context` присутній автоматично).
+Task 19.8c wired context + validation у `PredictionExtractor.extract()`. Тому
+`v2_extraction_run.py` використовує extractor напряму — без bypass, без дублювання
+validate logic. Extractor повертає `list[Prediction]` (вже validated, context populated,
+hallucinated-context claims dropped). Script тільки serializes їх у JSON.
 
 - [ ] **Step 1: Створити skeleton `scripts/v2_extraction_run.py`**
 
@@ -86,15 +91,9 @@ except ImportError:
 from evaluate_detection import (
     PROVIDER_API_KEY_ENV,
     MIN_CALL_INTERVAL_SECONDS,
-    CONCURRENCY_OVERRIDES,
 )
+from prophet_checker.analysis.extractor import PredictionExtractor
 from prophet_checker.llm.client import LLMClient
-from prophet_checker.llm.prompts import (
-    build_extraction_prompt,
-    get_extraction_system,
-    parse_extraction_response,
-    validate_context_in_post,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +109,7 @@ def select_posts_for_v2(posts: list[dict], v1_extractions: dict, model_id: str, 
     return [p for p in posts if p["id"] in target_post_ids and p["person_name"] == author]
 
 
-def build_llm_client(model_id: str) -> LLMClient:
+def build_extractor(model_id: str) -> PredictionExtractor:
     if "/" not in model_id:
         raise ValueError(f"model_id must be 'provider/model', got {model_id!r}")
     provider, model = model_id.split("/", 1)
@@ -120,65 +119,47 @@ def build_llm_client(model_id: str) -> LLMClient:
     api_key = os.environ.get(env_var)
     if not api_key:
         raise RuntimeError(f"Missing API key for {provider!r}: set {env_var}")
-    return LLMClient(provider=provider, model=model, api_key=api_key, temperature=0.0)
+    client = LLMClient(provider=provider, model=model, api_key=api_key, temperature=0.0)
+    return PredictionExtractor(client)
 
 
-async def extract_v2(llm: LLMClient, post: dict) -> list[dict]:
-    prompt = build_extraction_prompt(
-        text=post["text"],
-        person_name=post["person_name"],
-        published_date=post["published_at"],
-    )
-    try:
-        response = await llm.complete(prompt, system=get_extraction_system())
-    except Exception as e:
-        logger.exception("LLM call failed for post %s", post["id"])
-        return []
-    return parse_extraction_response(response)
-
-
-def validate_and_drop(raw_claims: list[dict], post_text: str) -> tuple[list[dict], int]:
-    kept: list[dict] = []
-    drops = 0
-    for claim in raw_claims:
-        ctx = claim.get("context", "")
-        if validate_context_in_post(ctx, post_text):
-            kept.append({**claim, "context_validated": True})
-        else:
-            drops += 1
-            logger.warning(
-                "Drop hallucinated context: claim=%r ctx_preview=%r",
-                claim.get("claim_text", "")[:60],
-                ctx[:60],
-            )
-    return kept, drops
+def serialize_v2_prediction(p) -> dict:
+    return {
+        "claim_text": p.claim_text,
+        "context": p.context,
+        "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
+        "target_date": p.target_date.isoformat() if p.target_date else None,
+        "topic": p.topic,
+    }
 
 
 async def run_extraction(model_id: str, posts: list[dict], min_interval: float) -> tuple[list[dict], dict]:
-    llm = build_llm_client(model_id)
+    extractor = build_extractor(model_id)
     extractions: list[dict] = []
-    total_raw = 0
-    total_drops = 0
+    total_kept = 0
 
     for post in posts:
-        raw_claims = await extract_v2(llm, post)
-        total_raw += len(raw_claims)
-        kept, drops = validate_and_drop(raw_claims, post["text"])
-        total_drops += drops
+        preds = await extractor.extract(
+            text=post["text"],
+            person_id=post["person_name"],
+            document_id=post["id"],
+            person_name=post["person_name"],
+            published_date=post["published_at"],
+        )
+        claims = [serialize_v2_prediction(p) for p in preds]
+        total_kept += len(claims)
         extractions.append({
             "post_id": post["id"],
             "post_published_at": post["published_at"],
             "post_text": post["text"],
-            "claims": kept,
+            "claims": claims,
         })
         if min_interval > 0:
             await asyncio.sleep(min_interval)
 
     stats = {
         "posts_processed": len(posts),
-        "claims_raw": total_raw,
-        "claims_kept": total_raw - total_drops,
-        "claims_hallucinated_drop": total_drops,
+        "claims_kept": total_kept,
     }
     return extractions, stats
 
@@ -234,6 +215,8 @@ if __name__ == "__main__":
     main()
 ```
 
+Note: import `validate_context_in_post` та функції `extract_v2`/`validate_and_drop` ВИДАЛЕНО (валідація тепер в extractor, Task 19.8c). `claims_raw` і `claims_hallucinated_drop` stats прибрано (extractor логує drops через warning). Metadata: `{posts_processed, claims_kept}`.
+
 - [ ] **Step 2: Створити failing tests `tests/test_v2_extraction_run.py`**
 
 ```python
@@ -279,28 +262,6 @@ def test_select_posts_for_v2_filters_by_author():
     }
     result = select_posts_for_v2(posts, v1_extractions, "m", "Арестович")
     assert [p["id"] for p in result] == ["A"]
-
-
-def test_validate_and_drop_keeps_valid_claims():
-    from v2_extraction_run import validate_and_drop
-    post_text = "Це повний текст посту з конкретним фрагментом усередині. Кінець."
-    raw_claims = [
-        {"claim_text": "claim 1", "context": "конкретним фрагментом усередині"},
-        {"claim_text": "claim 2", "context": "цього тексту немає у пості"},
-    ]
-    kept, drops = validate_and_drop(raw_claims, post_text)
-    assert drops == 1
-    assert len(kept) == 1
-    assert kept[0]["claim_text"] == "claim 1"
-    assert kept[0]["context_validated"] is True
-
-
-def test_validate_and_drop_handles_empty_context():
-    from v2_extraction_run import validate_and_drop
-    raw_claims = [{"claim_text": "x", "context": ""}]
-    kept, drops = validate_and_drop(raw_claims, "post text")
-    assert drops == 1
-    assert kept == []
 ```
 
 - [ ] **Step 3: Run tests — verify pass**
@@ -309,7 +270,7 @@ def test_validate_and_drop_handles_empty_context():
 cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python -m pytest tests/test_v2_extraction_run.py -v
 ```
 
-Expected: 4 PASS
+Expected: 2 PASS (select_posts_for_v2 tests only)
 
 - [ ] **Step 4: Full suite check**
 
@@ -317,7 +278,7 @@ Expected: 4 PASS
 cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python -m pytest 2>&1 | tail -3
 ```
 
-Expected: `154 passed` (150 baseline + 4 new)
+Expected: `152 passed` (150 baseline + 2 new select_posts tests)
 
 - [ ] **Step 5: Smoke test — dry run з `--limit 1`**
 
@@ -370,7 +331,7 @@ Expected output: щось схоже на
 V2 extraction model: gemini/gemini-3.1-flash-lite-preview
 Selected 1 posts (author=Арестович)
 Throttle: 7.0s/call → ~0.1 min
-Stats: {'posts_processed': 1, 'claims_raw': N, 'claims_kept': N-K, 'claims_hallucinated_drop': K}
+Stats: {'posts_processed': 1, 'claims_kept': N}
 Saved → scripts/outputs/verification_eval/_smoke_v2_extract.json
 ```
 
@@ -390,7 +351,7 @@ if post['claims']:
 "
 ```
 
-Expected: claims present, кожен claim має ключі `claim_text, prediction_date, target_date, topic, context, context_validated`. Якщо `context` key відсутній — модель не дотримала prompt. Якщо `context_validated: True` для всіх — substring check pass.
+Expected: claims present, кожен claim має ключі `claim_text, prediction_date, target_date, topic, context`. Якщо `context` key відсутній — модель не дотримала prompt. Validation вже проведена в extractor (hallucinated claims не повертаються).
 
 - [ ] **Step 3: Прибрати smoke artifact**
 
@@ -409,7 +370,7 @@ Expected:
 V2 extraction model: gemini/gemini-3.1-flash-lite-preview
 Selected 17 posts (author=Арестович)
 Throttle: 7.0s/call → ~2.0 min
-Stats: {'posts_processed': 17, 'claims_raw': ~33-37, 'claims_kept': ≥28, 'claims_hallucinated_drop': <8}
+Stats: {'posts_processed': 17, 'claims_kept': ~30-37}
 Saved → scripts/outputs/verification_eval/v2_extraction_outputs.json
 ```
 
@@ -422,29 +383,25 @@ d = json.load(open('scripts/outputs/verification_eval/v2_extraction_outputs.json
 m = d['metadata']
 print(f'Model: {m[\"model\"]}')
 print(f'Posts: {m[\"posts_processed\"]}')
-print(f'Raw claims: {m[\"claims_raw\"]}')
 print(f'Kept: {m[\"claims_kept\"]}')
-print(f'Dropped (hallucinated): {m[\"claims_hallucinated_drop\"]}')
-drop_rate = m['claims_hallucinated_drop'] / max(m['claims_raw'], 1)
-print(f'Drop rate: {drop_rate:.1%}')
-print(f'Expected drop_rate <30% threshold: {drop_rate < 0.30}')
+print('Validation: extractor handles drops internally (via warning logs)')
 "
 ```
 
-Expected: drop_rate < 30%. Якщо drop_rate ≥ 30% — investigate (можливо problem з prompt instruction, або whitespace normalize too strict). DONE_WITH_CONCERNS — escalate to user before continuing.
+Expected: posts_processed=17, claims_kept ≥28 (reasonable range). Validation вже проведена в extractor, stats не містять raw/drop counts.
 
-- [ ] **Step 6: Smoke — кожен kept claim має context_validated=True**
+- [ ] **Step 6: Smoke — кожен kept claim має context field**
 
 ```bash
 cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python -c "
 import json
 d = json.load(open('scripts/outputs/verification_eval/v2_extraction_outputs.json'))
-all_validated = all(
-    c.get('context_validated') is True
+all_have_context = all(
+    c.get('context')
     for ext in d['extractions']
     for c in ext['claims']
 )
-print(f'All kept claims have context_validated=True: {all_validated}')
+print(f'All kept claims have context field: {all_have_context}')
 "
 ```
 
@@ -1038,7 +995,7 @@ Expected: 35 entries, has_context=False (legacy was без context).
 cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python -m pytest 2>&1 | tail -3
 ```
 
-Expected: `154 passed` (150 baseline + 4 нових з Task 1)
+Expected: `152 passed` (150 baseline + 2 select_posts tests з Task 1)
 
 - [ ] **Step 4: Commit fresh gold**
 
@@ -1063,7 +1020,7 @@ Expected (most recent first):
 
 ## Done criteria
 
-- ✅ `scripts/v2_extraction_run.py` + 4 pure tests pass (154 total)
+- ✅ `scripts/v2_extraction_run.py` + 2 pure tests pass (152 total)
 - ✅ `scripts/v2_quality_eval.py` exists, decision-rule unit smoke pass
 - ✅ `scripts/outputs/verification_eval/v2_extraction_outputs.json` exists з ~30-37 claims, drop_rate < 30%
 - ✅ `scripts/outputs/verification_eval/v2_judgements.json` exists
@@ -1079,7 +1036,7 @@ Expected (most recent first):
 
 1. **V1 baseline cleanly comparable.** V1 використовував Gemini Flash Lite з V1 prompt на 17 Arestovich постах. V2 використовує той самий model на тих самих постах з V2 prompt. Direct comparison коректний.
 
-2. **PredictionExtractor.extract() не propagate'ить `context`.** Production extractor у `src/prophet_checker/analysis/extractor.py` не оновлений у 19.8a (out of scope). Тому Task 1 script bypass'ить його і використовує `parse_extraction_response` напряму. Це OK для eval — production wiring (Task 20) potentially оновить extractor.
+2. **PredictionExtractor.extract() тепер propagate'ить `context` та validation.** Task 19.8c updated `src/prophet_checker/analysis/extractor.py` для wiring context field + validation. Task 1 script тепер використовує extractor напряму (no bypass). Hallucinated claims dropped inside extractor, script тільки serializes valid claims.
 
 3. **Re-labeling — manual phase, не code.** Task 6 — interactive chat session. Implementer повинен зупинитись після Task 5 (decision verification) і escalate до human для inline labeling. Якщо implementer = subagent — він тільки готує `_partial_v2_labels.json` empty file (Step 2) і повертає DONE_WITH_CONCERNS з повідомленням "Ready for inline labeling, see Task 6 Step 3 workflow".
 
