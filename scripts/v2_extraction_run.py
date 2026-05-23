@@ -56,7 +56,7 @@ def build_extractor(model_id: str) -> PredictionExtractor:
 def serialize_v2_prediction(p) -> dict:
     return {
         "claim_text": p.claim_text,
-        "context": p.context,
+        "situation": p.situation,
         "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
         "target_date": p.target_date.isoformat() if p.target_date else None,
         "topic": p.topic,
