@@ -141,11 +141,11 @@ def test_prediction_has_value_field_default():
     assert pred.prediction_value is None
 
 
-def test_prediction_has_context_field_default():
+def test_prediction_has_situation_field_default():
     from datetime import date
     from prophet_checker.models.domain import Prediction
     pred = Prediction(
         id="p1", document_id="d1", person_id="per1",
         claim_text="Test", prediction_date=date(2024, 1, 1),
     )
-    assert pred.context is None
+    assert pred.situation is None

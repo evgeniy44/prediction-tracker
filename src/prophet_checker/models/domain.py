@@ -73,7 +73,7 @@ class Prediction(BaseModel):
     document_id: str
     person_id: str
     claim_text: str
-    context: str | None = None
+    situation: str | None = None
     prediction_date: date
     target_date: date | None = None
     topic: str = ""
