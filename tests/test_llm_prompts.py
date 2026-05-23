@@ -294,7 +294,7 @@ def test_extraction_template_includes_situation_field():
     assert '"situation": "..."' in EXTRACTION_TEMPLATE
 
 
-def test_parse_extraction_response_extracts_context():
+def test_parse_extraction_response_extracts_situation():
     import json
     from prophet_checker.llm.prompts import parse_extraction_response
     response = json.dumps({
@@ -304,13 +304,13 @@ def test_parse_extraction_response_extracts_context():
                 "prediction_date": "2024-01-15",
                 "target_date": "2026-12-31",
                 "topic": "війна",
-                "context": "Я думаю що війна закінчиться у 2026",
+                "situation": "Обговорення перспектив завершення війни у 2026",
             }
         ]
     })
     predictions = parse_extraction_response(response)
     assert len(predictions) == 1
-    assert predictions[0]["context"] == "Я думаю що війна закінчиться у 2026"
+    assert predictions[0]["situation"] == "Обговорення перспектив завершення війни у 2026"
 
 
 def test_build_verification_prompt_v2_accepts_situation_kwarg():
