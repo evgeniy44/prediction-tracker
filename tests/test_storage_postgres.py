@@ -150,7 +150,7 @@ def test_prediction_db_to_domain_includes_prediction_value():
     assert pred.prediction_value == PredictionValue.MEDIUM
 
 
-def test_domain_to_prediction_db_includes_context():
+def test_domain_to_prediction_db_includes_situation():
     from datetime import date
     from prophet_checker.models.domain import Prediction
     from prophet_checker.storage.postgres import domain_to_prediction_db
@@ -158,13 +158,13 @@ def test_domain_to_prediction_db_includes_context():
     pred = Prediction(
         id="p1", document_id="d1", person_id="per1",
         claim_text="Test", prediction_date=date(2024, 1, 1),
-        context="Verbatim quote from post",
+        situation="У відповідь на ситуацію X",
     )
     db_obj = domain_to_prediction_db(pred)
-    assert db_obj.context == "Verbatim quote from post"
+    assert db_obj.situation == "У відповідь на ситуацію X"
 
 
-def test_prediction_db_to_domain_includes_context():
+def test_prediction_db_to_domain_includes_situation():
     from datetime import date
     from prophet_checker.models.db import PredictionDB
     from prophet_checker.storage.postgres import prediction_db_to_domain
@@ -174,7 +174,7 @@ def test_prediction_db_to_domain_includes_context():
         claim_text="Test", prediction_date=date(2024, 1, 1),
         topic="", status="unresolved", confidence=0.0,
         verify_attempts=0,
-        context="Verbatim quote from post",
+        situation="У відповідь на ситуацію X",
     )
     pred = prediction_db_to_domain(db)
-    assert pred.context == "Verbatim quote from post"
+    assert pred.situation == "У відповідь на ситуацію X"

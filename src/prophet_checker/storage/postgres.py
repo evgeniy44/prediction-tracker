@@ -64,7 +64,7 @@ def raw_document_db_to_domain(db: RawDocumentDB) -> RawDocument:
 def domain_to_prediction_db(pred: Prediction) -> PredictionDB:
     return PredictionDB(
         id=pred.id, document_id=pred.document_id, person_id=pred.person_id,
-        claim_text=pred.claim_text, context=pred.context, prediction_date=pred.prediction_date,
+        claim_text=pred.claim_text, situation=pred.situation, prediction_date=pred.prediction_date,
         target_date=pred.target_date, topic=pred.topic,
         status=pred.status.value, confidence=pred.confidence,
         evidence_url=pred.evidence_url, evidence_text=pred.evidence_text,
@@ -82,7 +82,7 @@ def domain_to_prediction_db(pred: Prediction) -> PredictionDB:
 def prediction_db_to_domain(db: PredictionDB) -> Prediction:
     return Prediction(
         id=db.id, document_id=db.document_id, person_id=db.person_id,
-        claim_text=db.claim_text, context=db.context, prediction_date=db.prediction_date,
+        claim_text=db.claim_text, situation=db.situation, prediction_date=db.prediction_date,
         target_date=db.target_date, topic=db.topic,
         status=PredictionStatus(db.status), confidence=db.confidence,
         evidence_url=db.evidence_url, evidence_text=db.evidence_text,
