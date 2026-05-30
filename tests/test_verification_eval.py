@@ -204,3 +204,33 @@ def test_apply_decision_framework_all_filtered():
     decision = apply_decision_framework(per_model)
     assert decision["step3_winner"] is None
     assert "no models passed" in decision["step3_rationale"].lower()
+
+
+def test_filename_for_model_replaces_slash():
+    from verification_eval import filename_for_model
+    assert filename_for_model("anthropic/claude-sonnet-4-6") == "anthropic_claude-sonnet-4-6.json"
+
+
+def test_filename_for_model_preserves_dashes_and_dots():
+    from verification_eval import filename_for_model
+    assert filename_for_model("gemini/gemini-3.1-flash-lite-preview") == "gemini_gemini-3.1-flash-lite-preview.json"
+
+
+def test_list_existing_per_model_files(tmp_path):
+    from verification_eval import list_existing_per_model_files
+    (tmp_path / "anthropic_claude-haiku-4-5.json").write_text("{}")
+    (tmp_path / "openai_gpt-5-mini.json").write_text("{}")
+    (tmp_path / "not_a_model.txt").write_text("ignore")
+    found = list_existing_per_model_files(tmp_path)
+    assert set(found) == {"anthropic/claude-haiku-4-5", "openai/gpt-5-mini"}
+
+
+def test_list_existing_per_model_files_empty_dir(tmp_path):
+    from verification_eval import list_existing_per_model_files
+    assert list_existing_per_model_files(tmp_path) == []
+
+
+def test_list_existing_per_model_files_missing_dir(tmp_path):
+    from verification_eval import list_existing_per_model_files
+    missing = tmp_path / "does_not_exist"
+    assert list_existing_per_model_files(missing) == []

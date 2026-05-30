@@ -167,3 +167,22 @@ def apply_decision_framework(per_model: dict) -> dict:
         "step3_winner": winner,
         "step3_rationale": rationale,
     }
+
+
+def filename_for_model(model_id: str) -> str:
+    safe = model_id.replace("/", "_")
+    return f"{safe}.json"
+
+
+def list_existing_per_model_files(per_model_dir: Path) -> list[str]:
+    if not per_model_dir.exists():
+        return []
+    found = []
+    for path in per_model_dir.glob("*.json"):
+        stem = path.stem
+        if "_" not in stem:
+            continue
+        provider, _, model = stem.partition("_")
+        if provider in PROVIDER_API_KEY_ENV:
+            found.append(f"{provider}/{model}")
+    return found
