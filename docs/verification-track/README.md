@@ -1,7 +1,7 @@
 # Verifier-v2 — Project Status
 
 **Last updated:** 2026-05-23
-**You are here:** 🎯 19.8b COMPLETE (fresh gold 32 entries з situation) — далі 19.7b verification eval
+**You are here:** 🎯 19.7b script LANDED (181 tests) — далі real eval run + production model decision
 
 ---
 
@@ -14,7 +14,7 @@
 - ✅ **19.8c** — wire context у PredictionExtractor + drop on invalid. **Landed (2 commits, 152 tests pass).**
 - ✅ **19.8d** — `situation` field замінює verbatim context (model-paraphrase, presence-validated). **Landed (7 commits, 154 tests pass).** Емпіричне review показало verbatim context низькоцінний (TOC рядки, non-contiguous setup).
 - ✅ **19.8b** — V2 extraction re-run + quality re-eval + fresh gold. **Complete.** 32 Arestovich claims з situation, judge verdict TUNE (accepted — borderline, situation мета досягнута). Gold: `scripts/data/verification_gold_labels.json` (8 confirmed / 4 refuted / 9 unresolved / 11 premature).
-- 🔜 **19.7b** — Verification model eval (gold готовий). **Brainstorm pending.**
+- ✅ **19.7b script** — Verification model eval pipeline. **Landed (7 commits, 181 tests).** Реальний прогон 9 моделей × 32 predictions (~$1.70, ~30 хв) — окремий operational step.
 - 🔜 **Task 20** — VerificationOrchestrator + production wiring. **Pending all above.**
 
 ---
@@ -29,7 +29,7 @@ flowchart TD
     T198A[("Task 19.8a<br/>Schema + prompt")]:::done
     T198C[("Task 19.8c<br/>Extractor wiring")]:::done
     T198B[("Task 19.8b<br/>V2 run + quality + new gold")]:::done
-    T197B[("Task 19.7b<br/>Verifier eval")]:::pending
+    T197B[("Task 19.7b<br/>Verifier eval")]:::done
     T20[("Task 20<br/>Orchestrator + wiring")]:::pending
 
     T195 --> PV
