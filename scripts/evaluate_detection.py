@@ -99,6 +99,13 @@ MIN_CALL_INTERVAL_SECONDS = {
     "groq/llama-3.3-70b-versatile": 13.0,  # ~4.6 RPM, under TPM limit for ~2.5k tok/call
 }
 
+CONCURRENCY_OVERRIDES.setdefault("anthropic/claude-opus-4-6", 1)
+MIN_CALL_INTERVAL_SECONDS.setdefault("anthropic/claude-opus-4-6", 8.0)
+CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-2.5-pro", 2)
+MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-2.5-pro", 1.0)
+CONCURRENCY_OVERRIDES.setdefault("openai/gpt-5", 5)
+MIN_CALL_INTERVAL_SECONDS.setdefault("openai/gpt-5", 0.0)
+
 
 # =============================================================================
 # Metrics
