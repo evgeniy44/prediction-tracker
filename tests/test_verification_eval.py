@@ -90,3 +90,117 @@ def test_calibration_stats_empty():
     from verification_eval import calibration_stats
     stats = calibration_stats([])
     assert stats == {"mean_conf_correct": None, "mean_conf_wrong": None, "gap": None}
+
+
+def test_filter_blockers_drops_high_reject_rate():
+    from verification_eval import filter_blockers
+    per_model = {
+        "good": {"parser_reject_rate": 0.0, "status": {"accuracy": 0.8}},
+        "bad_reject": {"parser_reject_rate": 0.15, "status": {"accuracy": 0.8}},
+    }
+    survivors, filtered = filter_blockers(per_model)
+    assert "good" in survivors
+    assert "bad_reject" not in survivors
+    assert filtered == [{"model": "bad_reject", "reason": "parser_reject_rate=0.150 > 0.10"}]
+
+
+def test_filter_blockers_drops_low_accuracy():
+    from verification_eval import filter_blockers
+    per_model = {
+        "good": {"parser_reject_rate": 0.0, "status": {"accuracy": 0.8}},
+        "bad_acc": {"parser_reject_rate": 0.0, "status": {"accuracy": 0.4}},
+    }
+    survivors, filtered = filter_blockers(per_model)
+    assert "good" in survivors
+    assert "bad_acc" not in survivors
+    assert filtered == [{"model": "bad_acc", "reason": "status_accuracy=0.400 < 0.5"}]
+
+
+def test_find_quality_tier_top_minus_01():
+    from verification_eval import find_quality_tier
+    per_model = {
+        "opus":   {"status": {"accuracy": 0.86}},
+        "sonnet": {"status": {"accuracy": 0.83}},
+        "gpt5":   {"status": {"accuracy": 0.80}},
+        "haiku":  {"status": {"accuracy": 0.71}},
+    }
+    tier, max_acc = find_quality_tier(per_model)
+    assert max_acc == 0.86
+    assert set(tier) == {"opus", "sonnet", "gpt5"}
+    assert "haiku" not in tier
+
+
+def test_find_quality_tier_single_model():
+    from verification_eval import find_quality_tier
+    per_model = {"only": {"status": {"accuracy": 0.7}}}
+    tier, max_acc = find_quality_tier(per_model)
+    assert max_acc == 0.7
+    assert tier == ["only"]
+
+
+def test_find_quality_tier_empty():
+    from verification_eval import find_quality_tier
+    tier, max_acc = find_quality_tier({})
+    assert tier == []
+    assert max_acc == 0.0
+
+
+def test_tie_break_picks_cheapest_in_tier():
+    from verification_eval import tie_break_within_tier
+    per_model = {
+        "opus":   {"cost_total_usd": 0.50, "latency_mean_seconds": 4.0, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}},
+        "sonnet": {"cost_total_usd": 0.15, "latency_mean_seconds": 2.8, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}},
+        "gpt5":   {"cost_total_usd": 0.30, "latency_mean_seconds": 3.5, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}},
+    }
+    winner = tie_break_within_tier(["opus", "sonnet", "gpt5"], per_model)
+    assert winner == "sonnet"
+
+
+def test_tie_break_cost_tie_breaks_by_latency():
+    from verification_eval import tie_break_within_tier
+    per_model = {
+        "a": {"cost_total_usd": 0.10, "latency_mean_seconds": 3.0, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}},
+        "b": {"cost_total_usd": 0.10, "latency_mean_seconds": 2.0, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}},
+    }
+    assert tie_break_within_tier(["a", "b"], per_model) == "b"
+
+
+def test_tie_break_cost_and_latency_tie_breaks_by_strength_plus_value():
+    from verification_eval import tie_break_within_tier
+    per_model = {
+        "a": {"cost_total_usd": 0.10, "latency_mean_seconds": 2.0, "prediction_strength": {"accuracy": 0.6}, "prediction_value": {"accuracy": 0.5}},
+        "b": {"cost_total_usd": 0.10, "latency_mean_seconds": 2.0, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.5}},
+    }
+    assert tie_break_within_tier(["a", "b"], per_model) == "b"
+
+
+def test_tie_break_empty_tier():
+    from verification_eval import tie_break_within_tier
+    assert tie_break_within_tier([], {}) is None
+
+
+def test_apply_decision_framework_picks_winner_end_to_end():
+    from verification_eval import apply_decision_framework
+    per_model = {
+        "opus":    {"parser_reject_rate": 0.0,  "status": {"accuracy": 0.86}, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}, "cost_total_usd": 0.50, "latency_mean_seconds": 4.2},
+        "sonnet":  {"parser_reject_rate": 0.0,  "status": {"accuracy": 0.83}, "prediction_strength": {"accuracy": 0.74}, "prediction_value": {"accuracy": 0.66}, "cost_total_usd": 0.15, "latency_mean_seconds": 2.8},
+        "haiku":   {"parser_reject_rate": 0.0,  "status": {"accuracy": 0.71}, "prediction_strength": {"accuracy": 0.66}, "prediction_value": {"accuracy": 0.55}, "cost_total_usd": 0.03, "latency_mean_seconds": 1.8},
+        "broken":  {"parser_reject_rate": 0.20, "status": {"accuracy": 0.60}, "prediction_strength": {"accuracy": 0.5},  "prediction_value": {"accuracy": 0.4},  "cost_total_usd": 0.01, "latency_mean_seconds": 5.0},
+    }
+    decision = apply_decision_framework(per_model)
+    assert decision["step1_filtered_out"] == [{"model": "broken", "reason": "parser_reject_rate=0.200 > 0.10"}]
+    assert decision["step2_max_status_acc"] == 0.86
+    assert set(decision["step2_quality_tier"]) == {"opus", "sonnet"}
+    assert decision["step3_winner"] == "sonnet"
+    assert "Tier" in decision["step3_rationale"] or "tier" in decision["step3_rationale"]
+
+
+def test_apply_decision_framework_all_filtered():
+    from verification_eval import apply_decision_framework
+    per_model = {
+        "broken1": {"parser_reject_rate": 0.5, "status": {"accuracy": 0.3}},
+        "broken2": {"parser_reject_rate": 0.0, "status": {"accuracy": 0.2}},
+    }
+    decision = apply_decision_framework(per_model)
+    assert decision["step3_winner"] is None
+    assert "no models passed" in decision["step3_rationale"].lower()

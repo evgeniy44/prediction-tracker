@@ -101,3 +101,69 @@ def calibration_stats(items: list[dict]) -> dict:
         "mean_conf_wrong": mean_wrong,
         "gap": gap,
     }
+
+
+def filter_blockers(per_model: dict) -> tuple[dict, list[dict]]:
+    survivors = {}
+    filtered = []
+    for model, metrics in per_model.items():
+        reject = metrics.get("parser_reject_rate", 0.0)
+        status_acc = metrics.get("status", {}).get("accuracy", 0.0)
+        if reject > BLOCKER_REJECT_RATE:
+            filtered.append({"model": model, "reason": f"parser_reject_rate={reject:.3f} > {BLOCKER_REJECT_RATE:.2f}"})
+            continue
+        if status_acc < BLOCKER_MIN_STATUS_ACC:
+            filtered.append({"model": model, "reason": f"status_accuracy={status_acc:.3f} < {BLOCKER_MIN_STATUS_ACC}"})
+            continue
+        survivors[model] = metrics
+    return survivors, filtered
+
+
+def find_quality_tier(per_model: dict) -> tuple[list[str], float]:
+    if not per_model:
+        return [], 0.0
+    accs = {m: metrics["status"]["accuracy"] for m, metrics in per_model.items()}
+    max_acc = max(accs.values())
+    threshold = max_acc - QUALITY_TIER_TOLERANCE
+    tier = [m for m, acc in accs.items() if acc >= threshold]
+    return tier, max_acc
+
+
+def tie_break_within_tier(tier: list[str], per_model: dict) -> str | None:
+    if not tier:
+        return None
+
+    def sort_key(model: str) -> tuple:
+        m = per_model[model]
+        cost = m.get("cost_total_usd", 0.0)
+        latency = m.get("latency_mean_seconds", 0.0)
+        sv_sum = m.get("prediction_strength", {}).get("accuracy", 0.0) + m.get("prediction_value", {}).get("accuracy", 0.0)
+        return (cost, latency, -sv_sum)
+
+    return sorted(tier, key=sort_key)[0]
+
+
+def apply_decision_framework(per_model: dict) -> dict:
+    survivors, filtered = filter_blockers(per_model)
+    if not survivors:
+        return {
+            "step1_filtered_out": filtered,
+            "step2_max_status_acc": 0.0,
+            "step2_quality_tier": [],
+            "step3_winner": None,
+            "step3_rationale": "no models passed blocker filter",
+        }
+    tier, max_acc = find_quality_tier(survivors)
+    winner = tie_break_within_tier(tier, survivors)
+    if winner is None:
+        rationale = "no winner — empty quality tier"
+    else:
+        w = survivors[winner]
+        rationale = f"Tier-1 winner: lowest cost (${w['cost_total_usd']:.2f}), latency {w['latency_mean_seconds']:.2f}s"
+    return {
+        "step1_filtered_out": filtered,
+        "step2_max_status_acc": max_acc,
+        "step2_quality_tier": tier,
+        "step3_winner": winner,
+        "step3_rationale": rationale,
+    }
