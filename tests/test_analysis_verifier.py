@@ -12,7 +12,12 @@ def make_split_llm(verdict_raw: str, assessment_raw: str):
     llm = MagicMock()
 
     def route(prompt, system=None):
-        return verdict_raw if "fact-checker" in (system or "") else assessment_raw
+        text = system or ""
+        if "fact-checker" in text:
+            return verdict_raw
+        if "INDEPENDENT axes" in text:
+            return assessment_raw
+        raise AssertionError(f"unexpected system prompt: {text[:60]!r}")
 
     llm.complete = AsyncMock(side_effect=route)
     return llm
