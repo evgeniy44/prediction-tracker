@@ -356,3 +356,38 @@ def test_get_assessment_system_v2_injects_today_and_markers():
     assert "INDEPENDENT axes" in system
     assert "RARE" in system
     assert "fact-checker" not in system
+
+
+def test_parse_assessment_happy_path():
+    from prophet_checker.llm.prompts import parse_assessment_response_v2
+
+    raw = json.dumps({
+        "reasoning": "Vague hedge.",
+        "prediction_strength": "low",
+        "prediction_value": "high",
+    })
+    result = parse_assessment_response_v2(raw)
+    assert result == {"prediction_strength": "low"}
+
+
+def test_parse_assessment_strips_code_fence():
+    from prophet_checker.llm.prompts import parse_assessment_response_v2
+
+    raw = '```json\n{"prediction_strength": "medium", "prediction_value": "low"}\n```'
+    assert parse_assessment_response_v2(raw) == {"prediction_strength": "medium"}
+
+
+def test_parse_assessment_raises_on_missing_strength():
+    from prophet_checker.llm.prompts import parse_assessment_response_v2
+
+    raw = json.dumps({"prediction_value": "high"})
+    with pytest.raises(ValueError, match="missing required field: prediction_strength"):
+        parse_assessment_response_v2(raw)
+
+
+def test_parse_assessment_raises_on_invalid_strength():
+    from prophet_checker.llm.prompts import parse_assessment_response_v2
+
+    raw = json.dumps({"prediction_strength": "strong", "prediction_value": "high"})
+    with pytest.raises(ValueError, match="invalid prediction_strength"):
+        parse_assessment_response_v2(raw)

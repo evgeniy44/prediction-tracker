@@ -387,3 +387,18 @@ def parse_verification_response_v2(response: str) -> dict:
 
     data["evidence"] = evidence
     return data
+
+
+def parse_assessment_response_v2(response: str) -> dict:
+    data = json.loads(_strip_code_fence(response))
+
+    if "prediction_strength" not in data:
+        raise ValueError("missing required field: prediction_strength")
+
+    if data["prediction_strength"] not in {"low", "medium", "high"}:
+        raise ValueError(
+            f"invalid prediction_strength: {data['prediction_strength']!r} "
+            f"(expected low/medium/high)"
+        )
+
+    return {"prediction_strength": data["prediction_strength"]}
