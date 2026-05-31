@@ -1,7 +1,7 @@
 # Verifier-v2 — Project Status
 
-**Last updated:** 2026-05-23
-**You are here:** 🎯 19.7b script LANDED (181 tests) — далі real eval run + production model decision
+**Last updated:** 2026-05-31
+**You are here:** ✅ 19.9 Split Verifier LANDED (190 tests) — production model = Flash Lite, далі Task 20 orchestrator
 
 ---
 
@@ -14,8 +14,9 @@
 - ✅ **19.8c** — wire context у PredictionExtractor + drop on invalid. **Landed (2 commits, 152 tests pass).**
 - ✅ **19.8d** — `situation` field замінює verbatim context (model-paraphrase, presence-validated). **Landed (7 commits, 154 tests pass).** Емпіричне review показало verbatim context низькоцінний (TOC рядки, non-contiguous setup).
 - ✅ **19.8b** — V2 extraction re-run + quality re-eval + fresh gold. **Complete.** 32 Arestovich claims з situation, judge verdict TUNE (accepted — borderline, situation мета досягнута). Gold: `scripts/data/verification_gold_labels.json` (8 confirmed / 4 refuted / 9 unresolved / 11 premature).
-- ✅ **19.7b script** — Verification model eval pipeline. **Landed (7 commits, 181 tests).** Реальний прогон 9 моделей × 32 predictions (~$1.70, ~30 хв) — окремий operational step.
-- 🔜 **Task 20** — VerificationOrchestrator + production wiring. **Pending all above.**
+- ✅ **19.7b** — Verification model eval pipeline + реальний прогон 9 моделей. **Done.** Рішення: **production model = `gemini/gemini-3.1-flash-lite-preview`** (найдешевший, status конкурентний). Сага тюнінгу промтів V2→V7 → `19-7b-verification-eval/prompt-history.md`.
+- ✅ **19.9 Split Verifier** — 2-call архітектура (verdict + assessment) розриває single-call tradeoff. **Landed (6 commits, 190 tests).** Flash Lite: firm-status 0.833 / strength 0.719 / value 0.812 — максимум усіх трьох полів одночасно. `Verifier` клас у `analysis/verifier.py`.
+- 🔜 **Task 20** — VerificationOrchestrator + production wiring (інжектить `Verifier`). **Pending.**
 
 ---
 
@@ -29,7 +30,8 @@ flowchart TD
     T198A[("Task 19.8a<br/>Schema + prompt")]:::done
     T198C[("Task 19.8c<br/>Extractor wiring")]:::done
     T198B[("Task 19.8b<br/>V2 run + quality + new gold")]:::done
-    T197B[("Task 19.7b<br/>Verifier eval")]:::done
+    T197B[("Task 19.7b<br/>Verifier eval + model decision")]:::done
+    T199[("Task 19.9<br/>Split Verifier")]:::done
     T20[("Task 20<br/>Orchestrator + wiring")]:::pending
 
     T195 --> PV
@@ -40,7 +42,8 @@ flowchart TD
     T198C --> T198B
     PV --> T198A
     T198B --> T197B
-    T197B --> T20
+    T197B --> T199
+    T199 --> T20
 
     classDef done fill:#7fbf7f,stroke:#2d662d,color:#0a0a0a
     classDef specReady fill:#c4d8e8,stroke:#2c5777,color:#0a0a0a
@@ -149,29 +152,34 @@ ordinal_mean within ±0.2 V1 baseline AND hallucination_rate ≤ V1+5pp.
 
 ---
 
-### 🔜 Task 19.7b — Verification model evaluation
-**Спека:** TBD (brainstorm paused, чекає 19.8b)
-**Goal:** Multi-LLM evaluation V2 verification prompt проти fresh gold → decision який model use для production (Task 20).
+### ✅ Task 19.7b — Verification model evaluation
+**Спека/план:** `19-7b-verification-eval/{design,plan}.md`
+**Goal:** Multi-LLM evaluation V2 prompt проти fresh gold → production model decision.
+**Що зроблено:**
+- Eval pipeline (2 stages: run → aggregate), 9 моделей × 32 gold, 4-step decision framework (blockers → quality tier ±0.1 → cost tie-break → sanity check).
+- Реальний прогон + аналіз. **Рішення: production model = `gemini/gemini-3.1-flash-lite-preview`** (найдешевший, status конкурентний з дорожчими).
+- Сага тюнінгу промтів (фікс value-поля Gemini, що завжди давало "high"): V2→V7, документована з діфами + детермінованими метриками у `19-7b-verification-eval/prompt-history.md`. Ключовий висновок: single-call має **інхерентний tradeoff** (strength-fix псує status) → розв'язано декомпозицією у 19.9.
 
-**Накопичені рішення з brainstorm (документувати у spec пізніше):**
-- 9 моделей: Haiku 4.5, GPT-5-mini, Gemini Flash Lite, DeepSeek, Llama-Groq, Gemini 2.5 Pro, Sonnet 4.5, Opus 4.6, GPT-5 (full sweep)
-- Metrics: status_acc + 4×4 confusion + strength/value acc + parser_reject_rate + calibration + cost + latency
-- Decision framework: 4-step (blockers → quality tier ±0.1 → cost tie-break → manual sanity check)
-- No LLM-as-judge, no composite score
-- Pipeline: 2 stages (run → aggregate)
-- Sequential concurrency
-- Pure aggregation tests тільки
-- Outputs: JSON per stage + markdown report
+---
 
-**Blocked by:** 19.8b (потребує fresh gold з context для prompts).
+### ✅ Task 19.9 — Split Verifier (2-call)
+**Спека/план:** `19-9-split-verifier/{design,plan}.md`
+**Goal:** Production-верифікатор, що оцінює прогноз двома окремими викликами й об'єднує результат — розриває single-call tradeoff.
+**Що зроблено:**
+- **Call 1 (verdict):** чистий V3 промт → status/confidence/value/evidence/dates.
+- **Call 2 (assessment):** strength+value промт (orthogonality + high=RARE) → лише `prediction_strength`.
+- `Verifier` клас (`analysis/verifier.py`) — `asyncio.gather` обидва виклики, merge (override strength), all-or-nothing.
+- Кожен виклик отримує свій оптимальний фреймінг без cross-contamination.
+**Метрики (Flash Lite, 32 gold, детерміновано):** firm-status **0.833** / strength **0.719** / value **0.812** — максимум усіх трьох полів одночасно (неможливо для single-call).
+**Key commits:** `de6afd4` → `a670158` (6 commits, 181→190 tests).
 
 ---
 
 ### 🔜 Task 20 — VerificationOrchestrator + production wiring
-**Спека:** TBD (брейнстормити після 19.7b)
-**Goal:** Production wiring — orchestrator що бере unverified predictions з DB, виконує batch verification з winner model (19.7b decision), записує результати назад у DB з urgency triggers (verify_attempts, next_check_at, max_horizon).
+**Спека:** TBD (брейнстормити)
+**Goal:** Production wiring — orchestrator що бере unverified predictions з DB, інжектить `Verifier` (Flash Lite), виконує batch verification, записує результати назад у DB з urgency triggers (verify_attempts, next_check_at ← retry_after, max_horizon).
 
-**Blocked by:** 19.7b (треба знати який model production winner).
+**Unblocked:** 19.7b (model = Flash Lite) + 19.9 (`Verifier` готовий). Ready to brainstorm.
 
 ---
 
@@ -201,8 +209,10 @@ ordinal_mean within ±0.2 V1 baseline AND hallucination_rate ≤ V1+5pp.
 | `2026-05-07-task-19-5-schema-prompts-plan.md` | ✅ Executed |
 | `2026-05-12-prediction-value-extension-plan.md` | ✅ Implemented |
 | `2026-05-12-task-19-7a-gold-labeling-design.md` | ✅ Executed |
-| `2026-05-14-task-19-8a-extraction-context-schema-design.md` | 📋 Spec ready |
-| `2026-05-14-task-19-8b-v2-extraction-rerun-design.md` | 📋 Spec ready |
+| `2026-05-14-task-19-8a-extraction-context-schema-design.md` | ✅ Implemented |
+| `2026-05-14-task-19-8b-v2-extraction-rerun-design.md` | ✅ Implemented |
+| `19-7b-verification-eval/{design,plan}.md` + `prompt-history.md` | ✅ Executed |
+| `19-9-split-verifier/{design,plan}.md` | ✅ Executed |
 
 ---
 
