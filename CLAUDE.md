@@ -80,6 +80,6 @@ This project practices spec-driven development. Non-trivial work is specced as a
 Living indexes to orient from:
 - `docs/README.md` — index of all doc tracks.
 - `docs/architecture/2026-04-26-architecture-current.md` — module inventory, the 7 data flows, what's built vs. designed.
-- `docs/plan/2026-04-08-prophet-checker-plan.md` — master task plan.
+- `progress.md` (repo root) — project-wide progress log; per-track status in each `docs/<track>/README.md`.
 
-Most docs are written in Ukrainian. `progress.md` (project root) is the project-wide progress log — time, cost, milestones; the master plan and `architecture-current.md` hold per-task and per-module detail.
+Most docs are written in Ukrainian. `progress.md` (project root) is the project-wide progress log — time, cost, milestones; `architecture-current.md` holds module/flow detail and the per-track READMEs hold per-task detail.

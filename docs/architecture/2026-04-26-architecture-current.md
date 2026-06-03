@@ -100,7 +100,7 @@
 
 ## Cross-references
 
-- Master plan + task statuses: [`../plan/2026-04-08-prophet-checker-plan.md`](../plan/2026-04-08-prophet-checker-plan.md)
+- Project-wide progress: [`../../progress.md`](../../progress.md); per-track status у `docs/<track>/README.md`
 - Annotation rubric: [`../annotation/annotation-guidelines.md`](../annotation/annotation-guidelines.md)
 - Verifier v2 docs: [`../verifier-v2/`](../verifier-v2/)
 - Extraction eval docs: [`../extraction-quality-eval/`](../extraction-quality-eval/)

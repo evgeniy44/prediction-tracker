@@ -16,15 +16,15 @@ Project-wide джерело правди по статусу; per-track дета
 | Tests passing | 190 |
 | Tasks completed | M1 (5/5) + M2 (5/5) + M2.5 (eval/data) + Ingestion→production track + Verifier-v2 track (19.5→19.9) |
 | Tasks in flight | Task 20 (VerificationOrchestrator) — spec landed, план next |
-| Tasks queued | Recheck-луп, AWS deploy (23–24), CI (master-plan Task 20) |
+| Tasks queued | Recheck-луп, AWS deploy, GitHub Actions CI |
 | AWS cost | $0 (not deployed yet) |
 
 **Активний фокус:** Verifier-v2 track. Split-verifier (19.9) у production-коді; зараз —
 VerificationOrchestrator (Task 20, first-pass), що зв'язує `Verifier` з БД.
 
 > **Нумерація:** verifier-v2 track має власну внутрішню нумерацію (19.5/19.7/19.8/19.9/20).
-> Її "Task 20" (orchestrator) — це НЕ master-plan Task 20 (GitHub Actions CI). Master-план:
-> [`docs/plan/2026-04-08-prophet-checker-plan.md`](docs/plan/2026-04-08-prophet-checker-plan.md).
+> Її "Task 20" (orchestrator) — це verifier-track задача, не плутати з ранньою backlog-задачею
+> "GitHub Actions CI".
 
 ---
 

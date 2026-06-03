@@ -2,13 +2,10 @@
 
 Документи згруповані за use-case. Кожна підпапка — один логічний контур (фіча / задача / процес).
 
-## 📋 [`plan/`](plan/) — project tracking
-
-Master plan + status. Living documents.
+## 📋 Project tracking
 
 | Документ | Призначення |
 |----------|-------------|
-| [`2026-04-08-prophet-checker-plan.md`](plan/2026-04-08-prophet-checker-plan.md) | Master plan: всі задачі (M1–M6), milestones, retrospective notes per task |
 | [`../progress.md`](../progress.md) | Project-wide progress log (час, вартість, milestones) — перенесено у корінь репо |
 
 ## 🏛 [`architecture/`](architecture/) — architectural specs
