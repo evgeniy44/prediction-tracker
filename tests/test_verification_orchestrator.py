@@ -68,3 +68,65 @@ def test_apply_error_keeps_unverified():
     assert out.last_verify_error == "ValueError: bad json"
     assert out.last_verify_error_at == NOW
     assert out.verified_at is None
+
+
+from unittest.mock import AsyncMock, MagicMock
+
+from fakes import FakePredictionRepo
+from prophet_checker.verification.orchestrator import VerificationOrchestrator
+
+CONFIRMED_RESULT = {
+    "status": "confirmed", "confidence": 0.9, "prediction_strength": "low",
+    "prediction_value": "high", "evidence": "e", "retry_after": None, "max_horizon": None,
+}
+
+
+def _stub_verifier(**kwargs):
+    v = MagicMock()
+    v.verify = AsyncMock(**kwargs)
+    return v
+
+
+async def test_run_cycle_verifies_eligible():
+    repo = FakePredictionRepo()
+    await repo.save(_make_prediction("p1"))
+    orch = VerificationOrchestrator(repo, _stub_verifier(return_value=CONFIRMED_RESULT))
+
+    report = await orch.run_cycle()
+
+    assert report.verified == 1
+    assert report.failed == 0
+    assert report.skipped == 0
+    saved = (await repo.get_by_person("arestovich"))[0]
+    assert saved.status == PredictionStatus.CONFIRMED
+    assert saved.verified_at is not None
+
+
+async def test_run_cycle_skips_attempt_capped():
+    repo = FakePredictionRepo()
+    await repo.save(_make_prediction("p1", attempts=5))
+    verifier = _stub_verifier(return_value=CONFIRMED_RESULT)
+    orch = VerificationOrchestrator(repo, verifier, attempt_cap=5)
+
+    report = await orch.run_cycle()
+
+    assert report.skipped == 1
+    assert report.verified == 0
+    verifier.verify.assert_not_called()
+
+
+async def test_run_cycle_survives_per_item_failure():
+    repo = FakePredictionRepo()
+    await repo.save(_make_prediction("p1"))
+    await repo.save(_make_prediction("p2"))
+    verifier = _stub_verifier(side_effect=[ValueError("boom"), CONFIRMED_RESULT])
+    orch = VerificationOrchestrator(repo, verifier)
+
+    report = await orch.run_cycle()
+
+    assert report.failed == 1
+    assert report.verified == 1
+    preds = {p.id: p for p in await repo.get_by_person("arestovich")}
+    assert preds["p1"].verified_at is None
+    assert preds["p1"].last_verify_error.startswith("ValueError")
+    assert preds["p2"].verified_at is not None
