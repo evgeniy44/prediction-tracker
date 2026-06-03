@@ -1,7 +1,7 @@
 # Verifier-v2 — Project Status
 
-**Last updated:** 2026-05-31
-**You are here:** ✅ 19.9 Split Verifier LANDED (190 tests) — production model = Flash Lite, далі Task 20 orchestrator
+**Last updated:** 2026-06-03
+**You are here:** ✅ Task 20 VerificationOrchestrator LANDED (198 tests, first-pass) — далі recheck-луп / deploy
 
 ---
 
@@ -16,7 +16,7 @@
 - ✅ **19.8b** — V2 extraction re-run + quality re-eval + fresh gold. **Complete.** 32 Arestovich claims з situation, judge verdict TUNE (accepted — borderline, situation мета досягнута). Gold: `scripts/data/verification_gold_labels.json` (8 confirmed / 4 refuted / 9 unresolved / 11 premature).
 - ✅ **19.7b** — Verification model eval pipeline + реальний прогон 9 моделей. **Done.** Рішення: **production model = `gemini/gemini-3.1-flash-lite-preview`** (найдешевший, status конкурентний). Сага тюнінгу промтів V2→V7 → `19-7b-verification-eval/prompt-history.md`.
 - ✅ **19.9 Split Verifier** — 2-call архітектура (verdict + assessment) розриває single-call tradeoff. **Landed (6 commits, 190 tests).** Flash Lite: firm-status 0.833 / strength 0.719 / value 0.812 — максимум усіх трьох полів одночасно. `Verifier` клас у `analysis/verifier.py`.
-- 🔜 **Task 20** — VerificationOrchestrator + production wiring (інжектить `Verifier`). **Pending.**
+- ✅ **Task 20** — VerificationOrchestrator (first-pass). **Landed (6 commits, 198 tests).** Pull get_unverified → verify через `Verifier` → write-back з urgency-полями. Recheck-луп — окремий таск.
 
 ---
 
@@ -32,7 +32,7 @@ flowchart TD
     T198B[("Task 19.8b<br/>V2 run + quality + new gold")]:::done
     T197B[("Task 19.7b<br/>Verifier eval + model decision")]:::done
     T199[("Task 19.9<br/>Split Verifier")]:::done
-    T20[("Task 20<br/>Orchestrator + wiring")]:::pending
+    T20[("Task 20<br/>Orchestrator first-pass")]:::done
 
     T195 --> PV
     T195 --> T197A
@@ -175,11 +175,15 @@ ordinal_mean within ±0.2 V1 baseline AND hallucination_rate ≤ V1+5pp.
 
 ---
 
-### 🔜 Task 20 — VerificationOrchestrator + production wiring
-**Спека:** TBD (брейнстормити)
-**Goal:** Production wiring — orchestrator що бере unverified predictions з DB, інжектить `Verifier` (Flash Lite), виконує batch verification, записує результати назад у DB з urgency triggers (verify_attempts, next_check_at ← retry_after, max_horizon).
-
-**Unblocked:** 19.7b (model = Flash Lite) + 19.9 (`Verifier` готовий). Ready to brainstorm.
+### ✅ Task 20 — VerificationOrchestrator (first-pass)
+**Спека/план:** `20-verification-orchestrator/{design,plan}.md`
+**Goal:** Orchestrator бере unverified predictions з DB, верифікує кожен через `Verifier` (Flash Lite), пише результати назад з urgency-полями (verify_attempts, next_check_at ← retry_after, max_horizon).
+**Що зроблено:**
+- Новий пакет `verification/`: `VerificationOrchestrator.run_cycle` + pure `apply_verification_result/error` + `VerificationCycleReport`.
+- `PredictionStatus.PREMATURE` (4-й статус; без міграції — status це String(20)). `update()` персистить усі V2-поля. `factory.build_verification_orchestrator` + `gemini_api_key`. CLI `scripts/run_verification_cycle.py`.
+- Retry-eligible failures + attempt-cap (default 5); per-item try/except.
+**Скоуп:** лише first-pass. Recheck-луп (`premature` за next_check_at до max_horizon) — окремий таск.
+**Key commits:** `a2933a0` → `d329408` (6 commits, 190→198 tests).
 
 ---
 
