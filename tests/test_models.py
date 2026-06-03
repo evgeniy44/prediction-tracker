@@ -149,3 +149,10 @@ def test_prediction_has_situation_field_default():
         claim_text="Test", prediction_date=date(2024, 1, 1),
     )
     assert pred.situation is None
+
+
+def test_prediction_status_has_premature():
+    from prophet_checker.models.domain import PredictionStatus
+
+    assert PredictionStatus.PREMATURE == "premature"
+    assert PredictionStatus("premature") is PredictionStatus.PREMATURE

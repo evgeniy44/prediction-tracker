@@ -15,6 +15,7 @@ class PredictionStatus(str, Enum):
     CONFIRMED = "confirmed"
     REFUTED = "refuted"
     UNRESOLVED = "unresolved"
+    PREMATURE = "premature"
 
 
 class PredictionStrength(str, Enum):
