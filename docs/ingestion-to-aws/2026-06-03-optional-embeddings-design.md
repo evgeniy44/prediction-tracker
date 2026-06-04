@@ -17,14 +17,15 @@
 
 ## Дизайн: config-flag + опційний embedder
 
-- **`config.py`** — нове поле `embeddings_enabled: bool = True` (default зберігає поточну поведінку).
+- **`config.py`** — нове поле `embeddings_enabled: bool = False` (поки RAG не потрібен — ingestion
+  за замовчуванням gemini-only, без OpenAI; вмикається через `.env` `EMBEDDINGS_ENABLED=true`).
 - **`factory.build_orchestrator`** — будувати `EmbeddingClient` **лише** якщо `settings.embeddings_enabled`,
   інакше `embedder = None`. Коли вимкнено, `EmbeddingClient` не створюється → OpenAI-ключ не потрібен.
-- **`IngestionOrchestrator`** — `embedder` типізувати як опційний; ембед-луп під guard:
+- **`IngestionOrchestrator`** — `embedder` опційний; ембед-луп під guard:
   `if self._embedder is not None: for p in predictions: p.embedding = await self._embedder.embed(...)`.
   Коли `None` — `p.embedding` лишається `None` і зберігається (колонка nullable).
-- **`scripts/run_ingestion.py`** — прапорець `--no-embeddings` → `Settings(embeddings_enabled=False)`
-  (перекриває `.env`), щоб запускати gemini-only ad-hoc без редагування конфігу.
+- **Без CLI-прапорця** — embeddings керуються лише `embeddings_enabled` (default off). Жодних змін
+  у `run_ingestion.py` / `app.py`: вони беруть `Settings()`, який тепер за замовчуванням пропускає embeddings.
 
 **Чому не null-object embedder / не bool у orchestrator:** None-check — один рядок; окремий
 `NullEmbedder`-клас або дублюючий bool додають код без виграшу.
@@ -33,12 +34,11 @@
 
 | File | Зміна |
 |---|---|
-| `src/prophet_checker/config.py` | `embeddings_enabled: bool = True` |
+| `src/prophet_checker/config.py` | `embeddings_enabled: bool = False` |
 | `src/prophet_checker/factory.py` | будувати embedder лише якщо enabled, інакше `None` |
 | `src/prophet_checker/ingestion/orchestrator.py` | `embedder` опційний; guard ембед-лупу |
-| `scripts/run_ingestion.py` | `--no-embeddings` → `Settings(embeddings_enabled=False)` |
 | `tests/test_ingestion_orchestrator.py` | embedder=None → embed не викликається, embedding=None |
-| `docs/verification-track/20-verification-orchestrator/real-db-smoke.md` | нотатка про `--no-embeddings` (OPENAI не потрібен) |
+| `docs/verification-track/20-verification-orchestrator/real-db-smoke.md` | нотатка: embeddings off за замовч. (OPENAI не потрібен) |
 
 ## Потік даних (вимкнено)
 

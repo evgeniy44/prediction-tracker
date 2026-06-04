@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let ingestion run without an OpenAI key by skipping claim embeddings via a config flag.
+**Goal:** Let ingestion run without an OpenAI key by skipping claim embeddings; embeddings are **off by default**, enabled only via `EMBEDDINGS_ENABLED=true`.
 
-**Architecture:** `embeddings_enabled` config flag (default True); factory builds the `EmbeddingClient` only when enabled, else passes `embedder=None`; the orchestrator guards its embed loop on `embedder is not None`; the wrapper gets a `--no-embeddings` flag.
+**Architecture:** `embeddings_enabled` config flag (default **False**); factory builds the `EmbeddingClient` only when enabled, else passes `embedder=None`; the orchestrator guards its embed loop on `embedder is not None`. No CLI flag — `run_ingestion.py` / `app.py` are unchanged (they read `Settings()`, which now defaults to no embeddings).
 
 **Tech Stack:** Python 3.12, async, pydantic-settings, SQLAlchemy async, pytest (`asyncio_mode=auto`).
 
@@ -14,20 +14,21 @@
 
 **Test baseline:** 202 passed. Final expected: 203 (+1 T1).
 
+**Behavior note:** default False flips embeddings off for ALL ingestion (incl. `POST /ingest/run`) until `.env` sets `EMBEDDINGS_ENABLED=true`. Intended ("поки").
+
 ---
 
 ## File Structure
 
 | File | Change |
 |---|---|
-| `src/prophet_checker/config.py` | add `embeddings_enabled: bool = True` |
+| `src/prophet_checker/config.py` | add `embeddings_enabled: bool = False` |
 | `src/prophet_checker/factory.py` | build embedder only if enabled, else `None` |
 | `src/prophet_checker/ingestion/orchestrator.py` | guard embed loop on `embedder is not None` |
-| `scripts/run_ingestion.py` | `--no-embeddings` flag |
 | `tests/test_ingestion_orchestrator.py` | embedder=None → embed skipped test |
-| `docs/verification-track/20-verification-orchestrator/real-db-smoke.md` | note about `--no-embeddings` |
+| `docs/verification-track/20-verification-orchestrator/real-db-smoke.md` | note: embeddings off by default |
 
-**Models:** T1 SONNET (logic), T2 HAIKU, T3 HAIKU.
+**Models:** T1 SONNET (logic), T2 HAIKU.
 
 ---
 
@@ -101,12 +102,12 @@ In `src/prophet_checker/ingestion/orchestrator.py`, the predictions branch becom
 Run: `cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python -m pytest tests/test_ingestion_orchestrator.py::test_run_cycle_skips_embedding_when_no_embedder -v`
 Expected: PASS (embed skipped; prediction saved with default `embedding=None`).
 
-- [ ] **Step 5: Add the config flag**
+- [ ] **Step 5: Add the config flag (default False)**
 
 In `src/prophet_checker/config.py`, add this field to `Settings` (after `openai_api_key`):
 
 ```python
-    embeddings_enabled: bool = True
+    embeddings_enabled: bool = False
 ```
 
 - [ ] **Step 6: Make the factory build it conditionally**
@@ -131,10 +132,10 @@ with:
         )
 ```
 
-- [ ] **Step 7: Run full suite + import check**
+- [ ] **Step 7: Run full suite + config check**
 
-Run: `cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python -c "from prophet_checker.config import Settings; from prophet_checker.factory import build_verification_orchestrator; assert Settings().embeddings_enabled is True; print('config OK')" && .venv/bin/python -m pytest -q`
-Expected: `config OK`; full suite **203 passed**.
+Run: `cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python -c "from prophet_checker.config import Settings; from prophet_checker.factory import build_verification_orchestrator; assert Settings().embeddings_enabled is False; print('config OK')" && .venv/bin/python -m pytest -q`
+Expected: `config OK`; full suite **203 passed**. (If `config OK` fails, your local `.env` sets `EMBEDDINGS_ENABLED` — that's fine, skip the assert.)
 
 - [ ] **Step 8: Commit**
 
@@ -142,51 +143,11 @@ Expected: `config OK`; full suite **203 passed**.
 cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker
 git add src/prophet_checker/config.py src/prophet_checker/factory.py src/prophet_checker/ingestion/orchestrator.py tests/test_ingestion_orchestrator.py
 git commit -m "$(cat <<'EOF'
-feat(ingestion): опційні embeddings (embeddings_enabled, embedder=None)
+feat(ingestion): опційні embeddings (embeddings_enabled default False)
 
-config-flag (default True) → factory будує EmbeddingClient лише якщо enabled;
-orchestrator пропускає embed коли embedder=None. Дозволяє ingestion без OpenAI.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
-```
-
----
-
-### Task 2: `--no-embeddings` flag on the wrapper
-
-**Files:**
-- Modify: `scripts/run_ingestion.py`
-
-No automated test — verify by `--help`.
-
-- [ ] **Step 1: Add the flag + conditional Settings**
-
-In `scripts/run_ingestion.py`, after the existing `--limit` argument add:
-
-```python
-    parser.add_argument("--no-embeddings", action="store_true")
-```
-
-and replace `settings = Settings()` with:
-
-```python
-    settings = Settings(embeddings_enabled=False) if args.no_embeddings else Settings()
-```
-
-- [ ] **Step 2: Verify --help**
-
-Run: `cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python scripts/run_ingestion.py --help`
-Expected: help lists `--channel`, `--limit`, `--no-embeddings`; no import error.
-
-- [ ] **Step 3: Commit**
-
-```bash
-cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker
-git add scripts/run_ingestion.py
-git commit -m "$(cat <<'EOF'
-feat(scripts): run_ingestion --no-embeddings (gemini-only ingestion)
+factory будує EmbeddingClient лише якщо enabled; orchestrator пропускає embed
+коли embedder=None. Default off — ingestion gemini-only без OpenAI (вмикається
+через .env EMBEDDINGS_ENABLED=true).
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -195,7 +156,7 @@ EOF
 
 ---
 
-### Task 3: Note in the real-DB smoke runbook
+### Task 2: Note in the real-DB smoke runbook
 
 **Files:**
 - Modify: `docs/verification-track/20-verification-orchestrator/real-db-smoke.md`
@@ -206,7 +167,7 @@ In `real-db-smoke.md`, Step 1 "Варіант A", immediately after the `run_ing
 
 ```markdown
 
-> Додай `--no-embeddings`, щоб пропустити embeddings — тоді `OPENAI_API_KEY` не потрібен (лише `GEMINI_API_KEY` + Postgres). Прогнози просто не будуть RAG-searchable.
+> Embeddings за замовчуванням вимкнені (`EMBEDDINGS_ENABLED=False`) — `OPENAI_API_KEY` не потрібен, лише `GEMINI_API_KEY` + Postgres. Прогнози просто не будуть RAG-searchable. Щоб увімкнути — `EMBEDDINGS_ENABLED=true` у `.env`.
 ```
 
 - [ ] **Step 2: Commit**
@@ -215,7 +176,7 @@ In `real-db-smoke.md`, Step 1 "Варіант A", immediately after the `run_ing
 cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker
 git add docs/verification-track/20-verification-orchestrator/real-db-smoke.md
 git commit -m "$(cat <<'EOF'
-docs(verifier): real-db-smoke нотатка про --no-embeddings (без OpenAI)
+docs(verifier): real-db-smoke нотатка — embeddings off за замовчуванням
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -231,16 +192,11 @@ EOF
 Run: `cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python -m pytest -q`
 Expected: **203 passed**.
 
-- [ ] **Scripts parse**
-
-Run: `cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python scripts/run_ingestion.py --help`
-Expected: shows `--no-embeddings`, no error.
-
 - [ ] **Git state**
 
-Run: `cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && git log --oneline -3 && git status --short | grep -v "^??"`
-Expected: 3 task commits; working tree clean (tracked).
+Run: `cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && git log --oneline -2 && git status --short | grep -v "^??"`
+Expected: 2 task commits; working tree clean (tracked).
 
 - [ ] **Scope discipline**
 
-Confirm NOT modified: `alembic/`, `models/`, `app.py`, `llm/embedding.py`. This task touches only `config.py`, `factory.py`, `ingestion/orchestrator.py`, `scripts/run_ingestion.py`, the test file, and the runbook.
+Confirm NOT modified: `alembic/`, `models/`, `app.py`, `scripts/run_ingestion.py`, `llm/embedding.py`. This task touches only `config.py`, `factory.py`, `ingestion/orchestrator.py`, the test file, and the runbook.
