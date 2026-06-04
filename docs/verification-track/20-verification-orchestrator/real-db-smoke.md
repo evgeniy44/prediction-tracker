@@ -43,13 +43,14 @@ cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/alemb
 
 ### Варіант A — реальний ingestion (рекомендовано, e2e)
 
-- [ ] Прогнати ingestion на кількох постах (extract → save):
+- [ ] Прогнати ingestion на N постах (collect → extract → persist):
 
 ```bash
-cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python scripts/integration_smoke.py --channel @arestovich --limit 5
+cd /Users/evgenijberlog/Claude/Brain/Brain/prediction-tracker && .venv/bin/python scripts/run_ingestion.py --channel @arestovich --limit 10
 ```
 
-Очікувано: рядок `saved=N` (N прогнозів збережено, status=`unresolved`, verified_at=NULL).
+Очікувано: рядок `ps:@arestovich: seen=... with_predictions=... extracted=N error=-`
+(N прогнозів збережено, status=`unresolved`, verified_at=NULL). Зберігаються лише пости з прогнозами.
 
 ### Варіант B — seed без Telegram (мінімальний)
 
