@@ -459,3 +459,41 @@ async def test_unregistered_source_type_marks_error_and_continues():
     ch = report.channels_processed[0]
     assert ch.error is not None
     assert "NEWS" in ch.error.upper() or "news" in ch.error
+
+
+async def test_run_cycle_persists_raw_documents():
+    person_source = PersonSource(
+        id="ps1", person_id="p1", source_type=SourceType.TELEGRAM,
+        source_identifier="@arestovich",
+        last_collected_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    docs = [
+        RawDocument(
+            id=f"tg:arestovich:{i}", person_id="p1", source_type=SourceType.TELEGRAM,
+            url=f"https://t.me/arestovich/{i}",
+            published_at=datetime(2024, 1, 2 + i, tzinfo=UTC), raw_text=f"Post {i}",
+        )
+        for i in range(2)
+    ]
+    source_repo = FakeSourceRepo()
+    await source_repo.save_person_source(person_source)
+    prediction_repo = FakePredictionRepo()
+    pred = Prediction(
+        id="pred-1", document_id="tg:arestovich:0", person_id="p1",
+        claim_text="claim", prediction_date=date(2024, 1, 1),
+    )
+    extractor = MagicMock()
+    extractor.extract = AsyncMock(side_effect=[[pred], []])
+    factory, _ = _stub_session_factory()
+
+    orchestrator = IngestionOrchestrator(
+        session_factory=factory, source_repo=source_repo,
+        prediction_repo=prediction_repo, extractor=extractor,
+        embedder=_make_embedder(), sources={SourceType.TELEGRAM: MockSource(docs)},
+    )
+
+    await orchestrator.run_cycle()
+
+    saved = {d.id for d in source_repo._documents}
+    assert "tg:arestovich:0" in saved
+    assert "tg:arestovich:1" not in saved
