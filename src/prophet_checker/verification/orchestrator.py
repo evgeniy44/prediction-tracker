@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime
 
 from prophet_checker.models.domain import (
@@ -9,6 +10,8 @@ from prophet_checker.models.domain import (
     PredictionValue,
 )
 from prophet_checker.verification.report import VerificationCycleReport, VerificationEntry
+
+logger = logging.getLogger(__name__)
 
 
 def apply_verification_result(prediction: Prediction, result: dict, now: datetime) -> Prediction:
@@ -45,10 +48,11 @@ def apply_verification_error(prediction: Prediction, exc: Exception, now: dateti
 
 
 class VerificationOrchestrator:
-    def __init__(self, prediction_repo, verifier, attempt_cap: int = 5) -> None:
+    def __init__(self, prediction_repo, verifier, attempt_cap: int = 5, log_every: int = 50) -> None:
         self._prediction_repo = prediction_repo
         self._verifier = verifier
         self._attempt_cap = attempt_cap
+        self._log_every = log_every
 
     async def run_cycle(self, limit: int | None = None, today: date | None = None) -> VerificationCycleReport:
         started = datetime.now(UTC)
@@ -59,7 +63,7 @@ class VerificationOrchestrator:
         if limit is not None:
             eligible = eligible[:limit]
         report = VerificationCycleReport(started_at=started, skipped=skipped)
-        for p in eligible:
+        for i, p in enumerate(eligible, 1):
             try:
                 result = await self._verifier.verify(
                     claim=p.claim_text,
@@ -78,5 +82,14 @@ class VerificationOrchestrator:
                     VerificationEntry(prediction_id=p.id, error=f"{type(exc).__name__}: {exc}")
                 )
             await self._prediction_repo.update(updated)
+            if i % self._log_every == 0:
+                logger.info(
+                    "verification: %d/%d verified=%d failed=%d",
+                    i, len(eligible), report.verified, report.failed,
+                )
         report.finished_at = datetime.now(UTC)
+        logger.info(
+            "verification done: verified=%d failed=%d skipped=%d",
+            report.verified, report.failed, report.skipped,
+        )
         return report

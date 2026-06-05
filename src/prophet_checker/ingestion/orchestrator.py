@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Mapping
 
@@ -13,6 +14,8 @@ from prophet_checker.storage.interfaces import (
     SourceRepository,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class IngestionOrchestrator:
     def __init__(
@@ -23,6 +26,7 @@ class IngestionOrchestrator:
         extractor,
         embedder,
         sources: Mapping[SourceType, Source],
+        log_every: int = 50,
     ) -> None:
         self._session_factory = session_factory
         self._source_repo = source_repo
@@ -30,12 +34,14 @@ class IngestionOrchestrator:
         self._extractor = extractor
         self._embedder = embedder
         self._sources = sources
+        self._log_every = log_every
 
     async def run_cycle(self, limit: int | None = None) -> CycleReport:
         started_at = datetime.now(UTC)
         active = await self._source_repo.list_active_sources()
         channels: list[ChannelReport] = []
         for ps in active:
+            # print(f"Running ingestion cycle on source: {ps.id}/{ps.last_collected_at}/{ps.source_type}")
             report = await self._process_channel(ps, limit)
             channels.append(report)
         finished_at = datetime.now(UTC)
@@ -51,6 +57,7 @@ class IngestionOrchestrator:
             cursor_advanced_to=ps.last_collected_at,
         )
         source = self._sources.get(ps.source_type)
+        print(f"Running ingestion cycle on source: {ps.id}/{ps.person_id}")
         if source is None:
             report.error = f"no source registered for type={ps.source_type.value}"
             return report
@@ -86,6 +93,15 @@ class IngestionOrchestrator:
                                 ps.id, raw_doc.published_at, session=session
                             )
                 report.cursor_advanced_to = raw_doc.published_at
+                if report.posts_seen % self._log_every == 0:
+                    logger.info(
+                        "ingestion %s: seen=%d with_predictions=%d extracted=%d",
+                        ps.id, report.posts_seen, report.posts_with_predictions, report.predictions_extracted,
+                    )
         except Exception as exc:
             report.error = f"halted at step=processing: {exc}"
+        logger.info(
+            "ingestion %s done: seen=%d with_predictions=%d extracted=%d error=%s",
+            ps.id, report.posts_seen, report.posts_with_predictions, report.predictions_extracted, report.error or "-",
+        )
         return report
