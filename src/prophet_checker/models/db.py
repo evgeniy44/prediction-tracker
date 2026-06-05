@@ -30,7 +30,7 @@ class PersonDB(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     sources: Mapped[list[PersonSourceDB]] = relationship(back_populates="person")
     documents: Mapped[list[RawDocumentDB]] = relationship(back_populates="person")
@@ -59,10 +59,10 @@ class RawDocumentDB(Base):
     person_id: Mapped[str] = mapped_column(ForeignKey("persons.id"), nullable=False)
     source_type: Mapped[str] = mapped_column(String(50), nullable=False)
     url: Mapped[str] = mapped_column(String(2000), nullable=False, unique=True)
-    published_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
     language: Mapped[str] = mapped_column(String(10), default="uk")
-    collected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     processed: Mapped[bool] = mapped_column(Boolean, default=False)  # pipeline flag: predictions extracted?
 
     person: Mapped[PersonDB] = relationship(back_populates="documents")
@@ -84,7 +84,7 @@ class PredictionDB(Base):
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     evidence_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     evidence_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     embedding = mapped_column(Vector(1536), nullable=True)
     prediction_strength: Mapped[str | None] = mapped_column(String(10), nullable=True)
     prediction_value: Mapped[str | None] = mapped_column(String(10), nullable=True)
@@ -94,7 +94,7 @@ class PredictionDB(Base):
         Integer, default=0, nullable=False, server_default=text("0")
     )
     last_verify_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    last_verify_error_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_verify_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     document: Mapped[RawDocumentDB] = relationship(back_populates="predictions")
     person: Mapped[PersonDB] = relationship(back_populates="predictions")

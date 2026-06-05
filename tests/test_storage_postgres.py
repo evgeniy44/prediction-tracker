@@ -241,3 +241,13 @@ async def test_save_document_with_session_merges_without_commit():
     session.merge.assert_awaited_once()
     session.commit.assert_not_called()
     factory.assert_not_called()
+
+
+def test_timestamp_columns_are_timezone_aware():
+    from prophet_checker.models.db import PersonDB, PredictionDB, RawDocumentDB
+
+    assert PersonDB.__table__.c.created_at.type.timezone is True
+    assert RawDocumentDB.__table__.c.published_at.type.timezone is True
+    assert RawDocumentDB.__table__.c.collected_at.type.timezone is True
+    assert PredictionDB.__table__.c.verified_at.type.timezone is True
+    assert PredictionDB.__table__.c.last_verify_error_at.type.timezone is True
