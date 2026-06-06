@@ -73,3 +73,21 @@ def _post_entry(post_id: str, published_at, has_predictions: bool, source: str, 
         "post_note": "",
         "claims": claims,
     }
+
+
+async def load_db_positives(session_factory, n: int, min_chars: int, seed: int) -> list[dict]:
+    async with session_factory() as session:
+        docs = (await session.execute(
+            select(RawDocumentDB)
+            .where(func.length(RawDocumentDB.raw_text) >= min_chars)
+            .where(RawDocumentDB.id.in_(select(PredictionDB.document_id).distinct()))
+        )).scalars().all()
+        chosen = random.Random(seed).sample(list(docs), min(n, len(docs)))
+        result = []
+        for doc in chosen:
+            preds = (await session.execute(
+                select(PredictionDB).where(PredictionDB.document_id == doc.id)
+            )).scalars().all()
+            published = doc.published_at.date().isoformat() if doc.published_at else None
+            result.append(_post_entry(doc.id, published, True, "db", [_claim_entry(p) for p in preds]))
+        return result
