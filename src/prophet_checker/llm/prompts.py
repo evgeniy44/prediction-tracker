@@ -68,6 +68,33 @@ Verification tests:
 - Criterion 2: "Could an impartial fact-checker in 1 year objectively confirm or refute this?"
 - Criterion 4: "Would a reader 1 year later actually CARE whether this came true?" If no — it's not substantive.
 
+RECONSTRUCTION & FAITHFULNESS (how to phrase each extracted claim):
+
+R1. Self-contained form. Each claim_text must be a standalone, grammatical,
+    falsifiable sentence in the post's original language. Do NOT output bare
+    list items, fragments, or noun phrases. Do NOT keep list punctuation
+    (";", "—", trailing commas).
+
+R2. Enumerated forecasts. When a forecast is given as a bulleted/numbered
+    list, do NOT emit one claim per raw bullet. Reconstruct: either fold the
+    list into a single higher-level claim, or restate the substantive items
+    as full sentences — whichever faithfully captures what the author claims.
+
+R3. Preserve the author's stance and polarity. Capture WHOSE action is
+    predicted and WHETHER the author forecasts it will HAPPEN or FAIL. If the
+    author lists the steps of a process they predict will FAIL, the
+    prediction is the FAILURE of that process — do NOT extract each step as
+    if the author forecasts its success.
+
+EXAMPLE (enumerated agenda the author predicts will fail):
+Source: "Ожидаемые вехи на пути комиссии Ермак-Козак: — прекращение огня;
+— вода в Крым; — выборы в ОРДЛО... Поэтому, я думаю что у Путина-Зеленского
+не получится."
+WRONG -> ["прекращение огня;", "вода в Крым;", "выборы в ОРДЛО;"]
+        (fragments; inverted polarity — author predicts these will NOT happen)
+RIGHT -> "Процесс поэтапного примирения с РФ через комиссию Ермак–Козак
+        (прекращение огня, вода в Крым, выборы в ОРДЛО) в итоге провалится."
+
 Respond ONLY with raw JSON — do NOT wrap in markdown code fences."""
 
 EXTRACTION_TEMPLATE = """Analyze the following text by {person_name} (published on {published_date}).
@@ -79,7 +106,12 @@ Text:
 ---
 
 For each prediction, extract:
-- claim_text: the exact prediction (in original language)
+- claim_text: a SELF-CONTAINED reconstruction of the prediction, in the
+  post's original language. Rewrite it as one complete, grammatical,
+  falsifiable sentence — explicit subject + predicate + timeframe when known.
+  Never copy a bare list item or fragment; never keep list punctuation. The
+  sentence must state the AUTHOR'S OWN forecast with its correct polarity
+  (whether the author expects the event to HAPPEN or to FAIL / NOT happen).
 - prediction_date: when the prediction was made (YYYY-MM-DD)
 - target_date: when the predicted event should happen (YYYY-MM-DD or null if unclear)
 - topic: category (e.g., "війна", "економіка", "політика", "міжнародні відносини")
