@@ -91,3 +91,45 @@ async def load_db_positives(session_factory, n: int, min_chars: int, seed: int) 
             published = doc.published_at.date().isoformat() if doc.published_at else None
             result.append(_post_entry(doc.id, published, True, "db", [_claim_entry(p) for p in preds]))
         return result
+
+
+def build_extractor(model_id: str) -> PredictionExtractor:
+    provider, model = model_id.split("/", 1)
+    env_var = PROVIDER_API_KEY_ENV.get(provider)
+    if not env_var:
+        raise ValueError(f"Unknown provider {provider!r}")
+    api_key = os.environ.get(env_var)
+    if not api_key:
+        raise RuntimeError(f"Missing API key for {provider!r}: set {env_var}")
+    client = LLMClient(provider=provider, model=model, api_key=api_key, temperature=0.0)
+    return PredictionExtractor(client)
+
+
+async def collect_extractor_negatives(
+    posts, extractor, n: int, min_chars: int, seed: int, max_extractions: int, exclude_urls: set
+) -> list[dict]:
+    eligible = [
+        p for p in posts
+        if p.get("person_name") == "Арестович"
+        and len(p.get("text", "")) >= min_chars
+        and post_url(p["id"]) not in exclude_urls
+    ]
+    random.Random(seed).shuffle(eligible)
+    negatives, tried = [], 0
+    for p in eligible:
+        if len(negatives) >= n or tried >= max_extractions:
+            break
+        tried += 1
+        try:
+            preds = await extractor.extract(
+                text=p["text"], person_id=p["person_name"], document_id=p["id"],
+                person_name=p["person_name"], published_date=p["published_at"],
+            )
+        except Exception as exc:
+            print(f"  skip {p['id']}: {type(exc).__name__}: {exc}", flush=True)
+            continue
+        if not preds:
+            published = str(p["published_at"])[:10]
+            negatives.append(_post_entry(p["id"], published, False, "extractor_pool", []))
+        print(f"  [neg {len(negatives)}/{n}] tried={tried} {p['id']}: {len(preds)} claims", flush=True)
+    return negatives
