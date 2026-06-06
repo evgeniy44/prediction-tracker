@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 
 def test_select_posts_for_v2_keeps_only_posts_with_v1_claims():
-    from v2_extraction_run import select_posts_for_v2
+    from extraction.extraction_run import select_posts_for_v2
     posts = [
         {"id": "A", "person_name": "Арестович"},
         {"id": "B", "person_name": "Арестович"},
@@ -28,7 +28,7 @@ def test_select_posts_for_v2_keeps_only_posts_with_v1_claims():
 
 
 def test_select_posts_for_v2_filters_by_author():
-    from v2_extraction_run import select_posts_for_v2
+    from extraction.extraction_run import select_posts_for_v2
     posts = [
         {"id": "A", "person_name": "Арестович"},
         {"id": "B", "person_name": "Подоляк"},

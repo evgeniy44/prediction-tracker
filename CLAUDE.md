@@ -41,8 +41,8 @@ curl -X POST localhost:8000/ingest/run     # trigger one ingestion cycle
 .venv/bin/alembic revision --autogenerate -m "description"
 
 # Integration smoke — hits REAL Postgres + Telegram + LLM APIs (~$0.001–0.005/run)
-.venv/bin/python scripts/integration_smoke.py --channel @arestovich --limit 1
-.venv/bin/python scripts/integration_smoke.py --channel @arestovich --limit 1 --component gemini   # isolate one stage
+.venv/bin/python scripts/ingestion/integration_smoke.py --channel @arestovich --limit 1
+.venv/bin/python scripts/ingestion/integration_smoke.py --channel @arestovich --limit 1 --component gemini   # isolate one stage
 ```
 
 ## Architecture
@@ -63,7 +63,7 @@ Ingestion-cycle flow: `IngestionOrchestrator.run_cycle()` (`ingestion/orchestrat
 
 **LLM access is provider-agnostic via LiteLLM.** `llm/client.py` (`LLMClient`, completion) and `llm/embedding.py` (`EmbeddingClient`) wrap LiteLLM; prompt templates live in `llm/prompts.py`. Don't import a vendor SDK directly — go through these. Model is chosen via `.env` (`config.py` defaults to `openai/gpt-4o-mini`); evals selected Gemini 3.1 Flash Lite as the production extraction model.
 
-**Eval scripts share production code — do not fork it.** `scripts/` holds the evaluation pipelines (detection benchmark, extraction-quality LLM-as-judge, verification eval). They import the *same* extractor classes and the *same* prompts from `src/` and run them in a different mode. This is deliberate: a separate eval prompt would let "eval says the model is good" diverge from production behavior. Change a prompt or extractor once and both move together. Eval inputs live in `scripts/data/`, outputs in `scripts/outputs/`.
+**Eval scripts share production code — do not fork it.** `scripts/` holds the evaluation pipelines (detection benchmark, extraction-quality LLM-as-judge, verification eval). They import the *same* extractor classes and the *same* prompts from `src/` and run them in a different mode. This is deliberate: a separate eval prompt would let "eval says the model is good" diverge from production behavior. Change a prompt or extractor once and both move together. Eval inputs live in `scripts/data/`, outputs in `scripts/outputs/`. Scripts are grouped into domain packages — `scripts/{ingestion,extraction,verification}/` (each with `__init__.py`); cross-imports are package-qualified (e.g. `from extraction.detection_eval import ...`).
 
 ## Conventions
 

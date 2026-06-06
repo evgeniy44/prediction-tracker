@@ -29,12 +29,12 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(Path(__file__).parent.parent / ".env")
+    load_dotenv(Path(__file__).parent.parent.parent / ".env")
 except ImportError:
     pass  # dotenv optional; fallback to manual env vars
 
@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # =============================================================================
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 GOLD_LABELS_PATH = PROJECT_ROOT / "scripts" / "data" / "gold_labels.json"
 SAMPLE_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "sample_posts.json"
 RESULTS_DIR = PROJECT_ROOT / "scripts" / "outputs" / "detection_eval"

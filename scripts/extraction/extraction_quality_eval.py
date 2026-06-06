@@ -16,9 +16,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-# Add src/ to path so we can import LLMClient for the judge factory.
-# (scripts/ is already on sys.path implicitly when running this file directly.)
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add src/ and scripts/ to path for prophet_checker + sibling package imports.
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
 # Load .env early so provider API keys (ANTHROPIC_API_KEY, GEMINI_API_KEY, ...)
 # are available to litellm regardless of whether the user exported them in shell.
@@ -28,11 +28,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 try:
     from dotenv import load_dotenv  # noqa: E402
 
-    load_dotenv(Path(__file__).parent.parent / ".env", override=True)
+    load_dotenv(Path(__file__).parent.parent.parent / ".env", override=True)
 except ImportError:
     pass  # dotenv optional; fallback to environment
 
-from extraction_judge_prompts import (  # noqa: E402
+from extraction.judge_prompts import (  # noqa: E402
     JUDGE_SYSTEM,
     VERDICT_ORDINAL,
     VERDICT_VALUES,
@@ -43,7 +43,7 @@ from extraction_judge_prompts import (  # noqa: E402
 logger = logging.getLogger(__name__)
 
 # Import Task 13 evaluation harness components — reused without modification
-from evaluate_detection import (  # noqa: E402
+from extraction.detection_eval import (  # noqa: E402
     CONCURRENCY_OVERRIDES,
     MIN_CALL_INTERVAL_SECONDS,
     PROVIDER_API_KEY_ENV,
@@ -479,7 +479,7 @@ MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3-flash-preview", 7.0)
 CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3.1-pro-preview", 2)
 MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3.1-pro-preview", 1.0)
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "data" / "gold_labels.json"
 DEFAULT_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "sample_posts.json"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "scripts" / "outputs" / "extraction_eval"

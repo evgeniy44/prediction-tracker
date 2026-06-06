@@ -10,7 +10,7 @@ import sys
 from contextlib import AsyncExitStack
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
@@ -22,7 +22,7 @@ except ImportError:
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from _ingestion_setup import ensure_person_source
+from ingestion.ingestion_setup import ensure_person_source
 from prophet_checker.config import Settings
 from prophet_checker.factory import build_orchestrator
 

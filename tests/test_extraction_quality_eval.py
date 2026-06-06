@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from extraction_judge_prompts import (
+from extraction.judge_prompts import (
     VERDICT_VALUES,
     VERDICT_ORDINAL,
     JUDGE_SYSTEM,
@@ -89,7 +89,7 @@ def test_build_judge_prompt_handles_empty_claims():
 # =============================================================================
 
 
-from extraction_judge_prompts import parse_judge_response
+from extraction.judge_prompts import parse_judge_response
 
 
 def test_parse_judge_response_valid_json():
@@ -212,7 +212,7 @@ def test_parse_judge_response_handles_leading_preamble():
 # =============================================================================
 
 
-from extraction_quality_eval import aggregate_metrics
+from extraction.extraction_quality_eval import aggregate_metrics
 
 
 def _gold(yes_ids, no_ids):
@@ -398,7 +398,7 @@ def test_aggregate_metrics_handles_parse_error():
 import asyncio
 from datetime import date
 
-from extraction_quality_eval import run_stage1_extraction
+from extraction.extraction_quality_eval import run_stage1_extraction
 
 
 def _fake_pred(claim: str, topic: str = "війна") -> MagicMock:
@@ -509,7 +509,7 @@ async def test_stage1_handles_extractor_exception_as_empty_list(tmp_path):
 # =============================================================================
 
 
-from extraction_quality_eval import run_stage2_judge
+from extraction.extraction_quality_eval import run_stage2_judge
 
 
 def _make_judge_factory(response_map: dict[str, str]):
@@ -679,7 +679,7 @@ async def test_stage2_handles_judge_parse_failure(tmp_path):
 # =============================================================================
 
 
-from extraction_quality_eval import run_stage3_aggregate
+from extraction.extraction_quality_eval import run_stage3_aggregate
 
 
 def test_stage3_aggregate_writes_report_with_per_model_section(tmp_path):
@@ -720,7 +720,7 @@ def test_stage3_aggregate_writes_report_with_per_model_section(tmp_path):
 
 def test_cli_help_lists_stage_argument():
     """CLI --help mentions --stages, --judge, --extractors, --output-dir."""
-    from extraction_quality_eval import _build_arg_parser
+    from extraction.extraction_quality_eval import _build_arg_parser
 
     parser = _build_arg_parser()
     out = parser.format_help()
@@ -731,14 +731,14 @@ def test_cli_help_lists_stage_argument():
 
 
 def test_cli_parses_stages_csv():
-    from extraction_quality_eval import _build_arg_parser, _parse_stages
+    from extraction.extraction_quality_eval import _build_arg_parser, _parse_stages
 
     args = _build_arg_parser().parse_args(["--stages", "1,3"])
     assert _parse_stages(args.stages) == {1, 3}
 
 
 def test_cli_parses_extractors_csv():
-    from extraction_quality_eval import _build_arg_parser
+    from extraction.extraction_quality_eval import _build_arg_parser
 
     args = _build_arg_parser().parse_args(
         ["--extractors", "gemini/x,deepseek/y"]

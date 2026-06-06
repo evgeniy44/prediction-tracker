@@ -13,8 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from time import monotonic
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 try:
     from dotenv import load_dotenv
@@ -22,7 +23,7 @@ try:
 except ImportError:
     pass
 
-from evaluate_detection import (
+from extraction.detection_eval import (
     PROVIDER_API_KEY_ENV,
     CONCURRENCY_OVERRIDES,
     MIN_CALL_INTERVAL_SECONDS,

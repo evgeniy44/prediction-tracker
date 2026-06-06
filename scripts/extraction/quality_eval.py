@@ -9,8 +9,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 try:
     from dotenv import load_dotenv
@@ -18,15 +19,15 @@ try:
 except ImportError:
     pass
 
-from extraction_judge_prompts import (
+from extraction.judge_prompts import (
     JUDGE_SYSTEM,
     VERDICT_ORDINAL,
     VERDICT_VALUES,
     build_judge_prompt,
     parse_judge_response,
 )
-from evaluate_detection import PROVIDER_API_KEY_ENV
-from extraction_quality_eval import aggregate_metrics
+from extraction.detection_eval import PROVIDER_API_KEY_ENV
+from extraction.extraction_quality_eval import aggregate_metrics
 from prophet_checker.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)

@@ -5,24 +5,24 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 
 def test_compute_accuracy_all_correct():
-    from verification_eval import compute_accuracy
+    from verification.verification_eval import compute_accuracy
     pairs = [("a", "a"), ("b", "b"), ("c", "c")]
     assert compute_accuracy(pairs) == 1.0
 
 
 def test_compute_accuracy_half_correct():
-    from verification_eval import compute_accuracy
+    from verification.verification_eval import compute_accuracy
     pairs = [("a", "a"), ("b", "x"), ("c", "c"), ("d", "y")]
     assert compute_accuracy(pairs) == 0.5
 
 
 def test_compute_accuracy_empty_returns_zero():
-    from verification_eval import compute_accuracy
+    from verification.verification_eval import compute_accuracy
     assert compute_accuracy([]) == 0.0
 
 
 def test_compute_confusion_matrix_status_4_classes():
-    from verification_eval import compute_confusion_matrix, STATUS_LABELS
+    from verification.verification_eval import compute_confusion_matrix, STATUS_LABELS
     pairs = [
         ("confirmed", "confirmed"),
         ("confirmed", "unresolved"),
@@ -44,7 +44,7 @@ def test_compute_confusion_matrix_status_4_classes():
 
 
 def test_compute_confusion_matrix_strength_2_classes():
-    from verification_eval import compute_confusion_matrix, STRENGTH_LABELS
+    from verification.verification_eval import compute_confusion_matrix, STRENGTH_LABELS
     pairs = [("low", "low"), ("low", "medium"), ("medium", "medium")]
     matrix = compute_confusion_matrix(pairs, STRENGTH_LABELS)
     assert matrix["low"]["low"] == 1
@@ -54,7 +54,7 @@ def test_compute_confusion_matrix_strength_2_classes():
 
 
 def test_compute_confusion_matrix_skips_out_of_label_pred():
-    from verification_eval import compute_confusion_matrix, STRENGTH_LABELS
+    from verification.verification_eval import compute_confusion_matrix, STRENGTH_LABELS
     pairs = [("low", "high"), ("medium", "high")]
     matrix = compute_confusion_matrix(pairs, STRENGTH_LABELS)
     assert matrix["low"]["low"] == 0
@@ -64,7 +64,7 @@ def test_compute_confusion_matrix_skips_out_of_label_pred():
 
 
 def test_calibration_stats_well_calibrated():
-    from verification_eval import calibration_stats
+    from verification.verification_eval import calibration_stats
     items = [
         {"confidence": 0.9, "is_correct": True},
         {"confidence": 0.85, "is_correct": True},
@@ -78,7 +78,7 @@ def test_calibration_stats_well_calibrated():
 
 
 def test_calibration_stats_no_wrong():
-    from verification_eval import calibration_stats
+    from verification.verification_eval import calibration_stats
     items = [{"confidence": 0.9, "is_correct": True}]
     stats = calibration_stats(items)
     assert stats["mean_conf_correct"] == 0.9
@@ -87,13 +87,13 @@ def test_calibration_stats_no_wrong():
 
 
 def test_calibration_stats_empty():
-    from verification_eval import calibration_stats
+    from verification.verification_eval import calibration_stats
     stats = calibration_stats([])
     assert stats == {"mean_conf_correct": None, "mean_conf_wrong": None, "gap": None}
 
 
 def test_filter_blockers_drops_high_reject_rate():
-    from verification_eval import filter_blockers
+    from verification.verification_eval import filter_blockers
     per_model = {
         "good": {"parser_reject_rate": 0.0, "status": {"accuracy": 0.8}},
         "bad_reject": {"parser_reject_rate": 0.15, "status": {"accuracy": 0.8}},
@@ -105,7 +105,7 @@ def test_filter_blockers_drops_high_reject_rate():
 
 
 def test_filter_blockers_drops_low_accuracy():
-    from verification_eval import filter_blockers
+    from verification.verification_eval import filter_blockers
     per_model = {
         "good": {"parser_reject_rate": 0.0, "status": {"accuracy": 0.8}},
         "bad_acc": {"parser_reject_rate": 0.0, "status": {"accuracy": 0.4}},
@@ -117,7 +117,7 @@ def test_filter_blockers_drops_low_accuracy():
 
 
 def test_find_quality_tier_top_minus_01():
-    from verification_eval import find_quality_tier
+    from verification.verification_eval import find_quality_tier
     per_model = {
         "opus":   {"status": {"accuracy": 0.86}},
         "sonnet": {"status": {"accuracy": 0.83}},
@@ -131,7 +131,7 @@ def test_find_quality_tier_top_minus_01():
 
 
 def test_find_quality_tier_single_model():
-    from verification_eval import find_quality_tier
+    from verification.verification_eval import find_quality_tier
     per_model = {"only": {"status": {"accuracy": 0.7}}}
     tier, max_acc = find_quality_tier(per_model)
     assert max_acc == 0.7
@@ -139,14 +139,14 @@ def test_find_quality_tier_single_model():
 
 
 def test_find_quality_tier_empty():
-    from verification_eval import find_quality_tier
+    from verification.verification_eval import find_quality_tier
     tier, max_acc = find_quality_tier({})
     assert tier == []
     assert max_acc == 0.0
 
 
 def test_tie_break_picks_cheapest_in_tier():
-    from verification_eval import tie_break_within_tier
+    from verification.verification_eval import tie_break_within_tier
     per_model = {
         "opus":   {"cost_total_usd": 0.50, "latency_mean_seconds": 4.0, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}},
         "sonnet": {"cost_total_usd": 0.15, "latency_mean_seconds": 2.8, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}},
@@ -157,7 +157,7 @@ def test_tie_break_picks_cheapest_in_tier():
 
 
 def test_tie_break_cost_tie_breaks_by_latency():
-    from verification_eval import tie_break_within_tier
+    from verification.verification_eval import tie_break_within_tier
     per_model = {
         "a": {"cost_total_usd": 0.10, "latency_mean_seconds": 3.0, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}},
         "b": {"cost_total_usd": 0.10, "latency_mean_seconds": 2.0, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}},
@@ -166,7 +166,7 @@ def test_tie_break_cost_tie_breaks_by_latency():
 
 
 def test_tie_break_cost_and_latency_tie_breaks_by_strength_plus_value():
-    from verification_eval import tie_break_within_tier
+    from verification.verification_eval import tie_break_within_tier
     per_model = {
         "a": {"cost_total_usd": 0.10, "latency_mean_seconds": 2.0, "prediction_strength": {"accuracy": 0.6}, "prediction_value": {"accuracy": 0.5}},
         "b": {"cost_total_usd": 0.10, "latency_mean_seconds": 2.0, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.5}},
@@ -175,12 +175,12 @@ def test_tie_break_cost_and_latency_tie_breaks_by_strength_plus_value():
 
 
 def test_tie_break_empty_tier():
-    from verification_eval import tie_break_within_tier
+    from verification.verification_eval import tie_break_within_tier
     assert tie_break_within_tier([], {}) is None
 
 
 def test_apply_decision_framework_picks_winner_end_to_end():
-    from verification_eval import apply_decision_framework
+    from verification.verification_eval import apply_decision_framework
     per_model = {
         "opus":    {"parser_reject_rate": 0.0,  "status": {"accuracy": 0.86}, "prediction_strength": {"accuracy": 0.7}, "prediction_value": {"accuracy": 0.6}, "cost_total_usd": 0.50, "latency_mean_seconds": 4.2},
         "sonnet":  {"parser_reject_rate": 0.0,  "status": {"accuracy": 0.83}, "prediction_strength": {"accuracy": 0.74}, "prediction_value": {"accuracy": 0.66}, "cost_total_usd": 0.15, "latency_mean_seconds": 2.8},
@@ -196,7 +196,7 @@ def test_apply_decision_framework_picks_winner_end_to_end():
 
 
 def test_apply_decision_framework_all_filtered():
-    from verification_eval import apply_decision_framework
+    from verification.verification_eval import apply_decision_framework
     per_model = {
         "broken1": {"parser_reject_rate": 0.5, "status": {"accuracy": 0.3}},
         "broken2": {"parser_reject_rate": 0.0, "status": {"accuracy": 0.2}},
@@ -207,17 +207,17 @@ def test_apply_decision_framework_all_filtered():
 
 
 def test_filename_for_model_replaces_slash():
-    from verification_eval import filename_for_model
+    from verification.verification_eval import filename_for_model
     assert filename_for_model("anthropic/claude-sonnet-4-6") == "anthropic_claude-sonnet-4-6.json"
 
 
 def test_filename_for_model_preserves_dashes_and_dots():
-    from verification_eval import filename_for_model
+    from verification.verification_eval import filename_for_model
     assert filename_for_model("gemini/gemini-3.1-flash-lite-preview") == "gemini_gemini-3.1-flash-lite-preview.json"
 
 
 def test_list_existing_per_model_files(tmp_path):
-    from verification_eval import list_existing_per_model_files
+    from verification.verification_eval import list_existing_per_model_files
     (tmp_path / "anthropic_claude-haiku-4-5.json").write_text("{}")
     (tmp_path / "openai_gpt-5-mini.json").write_text("{}")
     (tmp_path / "not_a_model.txt").write_text("ignore")
@@ -226,12 +226,12 @@ def test_list_existing_per_model_files(tmp_path):
 
 
 def test_list_existing_per_model_files_empty_dir(tmp_path):
-    from verification_eval import list_existing_per_model_files
+    from verification.verification_eval import list_existing_per_model_files
     assert list_existing_per_model_files(tmp_path) == []
 
 
 def test_list_existing_per_model_files_missing_dir(tmp_path):
-    from verification_eval import list_existing_per_model_files
+    from verification.verification_eval import list_existing_per_model_files
     missing = tmp_path / "does_not_exist"
     assert list_existing_per_model_files(missing) == []
 
@@ -242,7 +242,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 
 def test_run_for_model_smoke_with_mock(tmp_path):
-    from verification_eval import run_for_model, save_per_model_artifact
+    from verification.verification_eval import run_for_model, save_per_model_artifact
 
     valid_response = json_mod.dumps({
         "status": "premature",
@@ -269,7 +269,7 @@ def test_run_for_model_smoke_with_mock(tmp_path):
         async def complete(self, prompt, system):
             return valid_response
 
-    import verification_eval
+    from verification import verification_eval
     original = verification_eval.build_llm_client
     verification_eval.build_llm_client = lambda mid: FakeLLM()
     try:
@@ -293,7 +293,7 @@ def test_run_for_model_smoke_with_mock(tmp_path):
 
 
 def test_render_report_includes_winner_and_table():
-    from verification_eval import render_report
+    from verification.verification_eval import render_report
     per_model = {
         "anthropic/claude-sonnet-4-6": {
             "status": {"accuracy": 0.81},

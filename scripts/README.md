@@ -1,6 +1,16 @@
 # `scripts/` — operational scripts and data
 
-Python-скрипти живуть плоско в `scripts/` (через cross-imports). Дані та артефакти прогонів згруповані по сценаріях у підкаталогах.
+Python-скрипти згруповані в пакети **за доменом** (`ingestion/`, `extraction/`, `verification/`); кожен має `__init__.py`, крос-імпорти — пакетні (`from extraction.detection_eval import …`). Дані та артефакти прогонів — у `data/` та `outputs/`.
+
+```
+scripts/
+  ingestion/      run_ingestion · ingestion_setup · integration_smoke
+  extraction/     run_extraction · sample_posts · extraction_run · detection_eval
+                  · extraction_quality_eval · quality_eval · judge_prompts
+  verification/   run_verification · run_verification_cycle · verification_eval
+  data/           eval-входи (gold, sample posts, dumps)
+  outputs/        eval-виходи
+```
 
 ## Сценарії
 
@@ -35,12 +45,12 @@ Python-скрипти живуть плоско в `scripts/` (через cross-
 YES/NO-класифікація: чи є взагалі передбачення в пості.
 
 ```bash
-.venv/bin/python scripts/evaluate_detection.py --model all-primary
+.venv/bin/python scripts/extraction/detection_eval.py --model all-primary
 ```
 
 | Файл | Опис |
 |------|------|
-| `evaluate_detection.py` | CLI: 5 моделей × 2 промптові версії, F1/precision/recall |
+| `extraction/detection_eval.py` | CLI: 5 моделей × 2 промптові версії, F1/precision/recall |
 | `outputs/detection_eval/detection_results_<provider>_<model>.json` | Результати v2 (поточний промпт) |
 | `outputs/detection_eval/detection_results_<...>_v1_baseline.json` | Результати v1 (baseline промпт) |
 
@@ -51,13 +61,13 @@ YES/NO-класифікація: чи є взагалі передбачення
 LLM-as-judge для якості витягнутих claims.
 
 ```bash
-.venv/bin/python scripts/extraction_quality_eval.py --gold-only
+.venv/bin/python scripts/extraction/extraction_quality_eval.py --gold-only
 ```
 
 | Файл | Опис |
 |------|------|
-| `extraction_quality_eval.py` | 3-stage pipeline: extraction → Opus judge → aggregate |
-| `extraction_judge_prompts.py` | Judge SYSTEM + USER templates, 6-value verdict enum |
+| `extraction/extraction_quality_eval.py` | 3-stage pipeline: extraction → Opus judge → aggregate |
+| `extraction/judge_prompts.py` | Judge SYSTEM + USER templates, 6-value verdict enum |
 | `outputs/extraction_eval/extraction_outputs.json` | Stage 1 artifact: extractor → post → claims[] |
 | `outputs/extraction_eval/extraction_judgements.json` | Stage 2 artifact: per-claim verdicts + missed_predictions |
 | `outputs/extraction_eval/extraction_eval_report.json` | Stage 3 artifact: aggregated metrics |
@@ -67,13 +77,9 @@ LLM-as-judge для якості витягнутих claims.
 
 ## Cross-imports
 
-`extraction_quality_eval.py` імпортує з `evaluate_detection.py`:
-- `CONCURRENCY_OVERRIDES` — per-model concurrency limits
-- `MIN_CALL_INTERVAL_SECONDS` — per-model rate-limit throttle
-- `PROVIDER_API_KEY_ENV` — provider → env-var mapping
-- `_default_extractor_factory` — LiteLLM-backed extractor builder
+Крос-імпорти — пакетні. Напр. `extraction/extraction_quality_eval.py` тягне з `extraction/detection_eval.py`: `CONCURRENCY_OVERRIDES`, `MIN_CALL_INTERVAL_SECONDS`, `PROVIDER_API_KEY_ENV`, `_default_extractor_factory`. Крос-доменна — лише одна: `verification/verification_eval.py` → `extraction/detection_eval.py`.
 
-Тому скрипти лежать в одній папці (Python виявляє один з одного через `sys.path[0]`).
+Кожен скрипт додає `scripts/` у `sys.path`, тож пакети (`ingestion`/`extraction`/`verification`) резолвляться і при `python scripts/<домен>/<file>.py`, і під pytest (`pythonpath` містить `scripts`).
 
 ## Виконання тестів
 

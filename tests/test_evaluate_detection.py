@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from evaluate_detection import (
+from extraction.detection_eval import (
     classify_post,
     compute_metrics,
     run_evaluation_for_model,

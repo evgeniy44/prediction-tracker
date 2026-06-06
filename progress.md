@@ -59,7 +59,7 @@ Ingestion pipeline + FastAPI HTTP trigger працюють end-to-end (підт�
 | 16 — FastAPI app entry | `GET /health` + `POST /ingest/run`, composition root у `factory.py` |
 | 17 — Docker Compose | Postgres + pgvector контейнер, local dev workflow |
 | 18 — Alembic on real Postgres | міграції застосовуються на реальній БД |
-| 19 — Integration smoke | `scripts/integration_smoke.py` (real Postgres + Telegram + LLM) |
+| 19 — Integration smoke | `scripts/ingestion/integration_smoke.py` (real Postgres + Telegram + LLM) |
 
 Специфікації: [`docs/ingestion-to-aws/`](docs/ingestion-to-aws/).
 
@@ -80,8 +80,8 @@ Ingestion pipeline + FastAPI HTTP trigger працюють end-to-end (підт�
 | 19.9 — Split Verifier (2-call) | ✅ | verdict + assessment виклики розривають single-call tradeoff. **Flash Lite: firm-status 0.833 / strength 0.719 / value 0.812.** `Verifier` у `analysis/verifier.py`. Commits `de6afd4`→`a670158` |
 | 20 — VerificationOrchestrator (first-pass) | ✅ | Pull get_unverified → `Verifier` → write-back з urgency-полями. `verification/` пакет + PREMATURE + update() V2 + factory + CLI. Commits `a2933a0`→`d329408`, 190→198 tests |
 
-**Допоміжне:** 3-стадійний pipeline `sample_arestovich_posts → run_extraction → run_verification`
-для ручного рев'ю якості (`scripts/`, outputs у `scripts/outputs/pipeline_run/`).
+**Допоміжне:** 3-стадійний pipeline `extraction/sample_posts → extraction/run_extraction → verification/run_verification`
+для ручного рев'ю якості (outputs у `scripts/outputs/pipeline_run/`).
 
 ---
 
