@@ -1,7 +1,26 @@
 #!/usr/bin/env python3
 """Extraction Quality Evaluation — Task 13.5.
 
-LLM-as-judge eval for prediction extraction quality across 3 models.
+Що робить: 3-стадійний LLM-as-judge eval якості витягнутих прогнозів — ганяє
+кілька extractor-моделей на тих самих постах, суддя (Opus) оцінює кожен claim,
+а далі агрегуються метрики precision/recall/quality по моделях.
+
+Вхід:
+- --posts (default scripts/data/sample_posts.json): пул постів
+  [{id, person_name, published_at, text}].
+- --gold (default scripts/data/gold_labels.json): [{id, has_prediction}] —
+  для recall та режиму --gold-only.
+- --extractors: CSV моделей-екстракторів (default: Flash Lite, DeepSeek,
+  Sonnet, Gemini 3 Flash); --judge: модель-суддя (default Opus).
+- --author / --limit / --gold-only / --stages: фільтр автора, ліміт постів,
+  лише gold-пости, та які стадії (1,2,3) запускати.
+- API-ключі провайдерів у .env (GEMINI/OPENAI/ANTHROPIC/... — скрипт ганяє LLM).
+
+Вихід (у --output-dir, default scripts/outputs/extraction_eval/):
+- extraction_outputs.json — Стадія 1: модель → пост → claims[].
+- extraction_judgements.json — Стадія 2: per-claim вердикти + missed_predictions.
+- extraction_eval_report.json — Стадія 3: агреговані метрики по моделях.
+
 See spec: docs/extraction-quality-eval/2026-04-21-extraction-quality-eval-design.md
 """
 from __future__ import annotations
