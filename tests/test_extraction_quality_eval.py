@@ -938,3 +938,9 @@ def test_aggregate_metrics_empty_gold_treated_as_no_gold():
     assert m["missed_rate"] is None
     assert m["gold_agreement"] is None
     assert m["total_claims"] == 1
+
+
+def test_arg_parser_has_no_gold_flag():
+    from extraction.extraction_quality_eval import _build_arg_parser
+    assert _build_arg_parser().parse_args(["--no-gold"]).no_gold is True
+    assert _build_arg_parser().parse_args([]).no_gold is False

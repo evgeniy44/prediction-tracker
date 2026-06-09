@@ -14,6 +14,7 @@
   Sonnet, Gemini 3 Flash); --judge: модель-суддя (default Opus).
 - --author / --limit / --gold-only / --stages: фільтр автора, ліміт постів,
   лише gold-пости, та які стадії (1,2,3) запускати.
+- --no-gold: запуск без gold (gold-залежні поля missed_rate/gold_agreement → null).
 - API-ключі провайдерів у .env (GEMINI/OPENAI/ANTHROPIC/... — скрипт ганяє LLM).
 
 Вихід (у --output-dir, default scripts/outputs/extraction_eval/):
@@ -583,6 +584,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=False,
         help="Process only posts that appear in gold_labels.json (97 for Arestovich)",
     )
+    parser.add_argument(
+        "--no-gold",
+        action="store_true",
+        default=False,
+        help="Run without gold labels (gold-derived fields -> null)",
+    )
     return parser
 
 
@@ -658,7 +665,7 @@ async def _main_async(args: argparse.Namespace) -> None:
         print("Stage 3: aggregating metrics")
         report = run_stage3_aggregate(
             judgements_path=judgements_path,
-            gold_labels_path=Path(args.gold),
+            gold_labels_path=None if args.no_gold else Path(args.gold),
             output_path=report_path,
         )
         _print_report_table(report)
@@ -685,6 +692,8 @@ def _print_report_table(report: dict) -> None:
 def main() -> None:
     parser = _build_arg_parser()
     args = parser.parse_args()
+    if args.no_gold and args.gold_only:
+        parser.error("--no-gold та --gold-only взаємовиключні")
     logging.basicConfig(level=logging.WARNING)
     asyncio.run(_main_async(args))
 
