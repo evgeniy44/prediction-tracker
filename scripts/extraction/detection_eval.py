@@ -205,7 +205,9 @@ def _parse_model_id(model_id: str) -> tuple[str, str]:
     return provider, model
 
 
-def _default_extractor_factory(model_id: str) -> PredictionExtractor:
+def _default_extractor_factory(
+    model_id: str, system_prompt: str | None = None
+) -> PredictionExtractor:
     """Build a PredictionExtractor for the given model_id using env-var API keys."""
     provider, model = _parse_model_id(model_id)
 
@@ -228,7 +230,7 @@ def _default_extractor_factory(model_id: str) -> PredictionExtractor:
         api_key=api_key,
         temperature=0.0,
     )
-    return PredictionExtractor(client)
+    return PredictionExtractor(client, system_prompt=system_prompt)
 
 
 # =============================================================================

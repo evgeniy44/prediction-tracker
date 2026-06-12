@@ -1055,3 +1055,21 @@ def test_load_filtered_posts_limit_applies_author_then_slices(tmp_path):
     # --limit pre-filters by author (same as the old inline logic), then slices
     assert [p["id"] for p in posts] == ["a1"]
     assert counts == {"pool": 3, "after_limit": 1, "after_author": 1}
+
+
+# =============================================================================
+# Group E — prompt-variant plumbing (--extraction-prompt)
+# =============================================================================
+
+
+def test_default_extractor_factory_passes_system_prompt(monkeypatch):
+    from extraction.detection_eval import _default_extractor_factory
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    extractor = _default_extractor_factory(
+        "gemini/gemini-3.1-flash-lite-preview", system_prompt="CUSTOM"
+    )
+    assert extractor._system_prompt == "CUSTOM"
+
+    extractor_default = _default_extractor_factory("gemini/gemini-3.1-flash-lite-preview")
+    assert extractor_default._system_prompt is None
