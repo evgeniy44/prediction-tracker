@@ -95,7 +95,7 @@ CONCURRENCY_OVERRIDES = {
 # when paired with concurrency=1). Use to stay under strict free-tier RPM limits
 # when LiteLLM's built-in retries can't keep up.
 MIN_CALL_INTERVAL_SECONDS = {
-    "gemini/gemini-3.1-flash-lite-preview": 7.0,  # ~8.5 RPM, under free tier limit
+    "gemini/gemini-3.1-flash-lite-preview": 1.0,  # ~8.5 RPM, under free tier limit
     "groq/llama-3.3-70b-versatile": 13.0,  # ~4.6 RPM, under TPM limit for ~2.5k tok/call
 }
 

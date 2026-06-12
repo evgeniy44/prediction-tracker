@@ -493,19 +493,20 @@ PRIMARY_EXTRACTORS: tuple[str, ...] = (
     "anthropic/claude-sonnet-4-6",
     "gemini/gemini-3-flash-preview",  # added 2026-04-21 for cross-tier Gemini comparison
 )
-DEFAULT_JUDGE = "anthropic/claude-opus-4-6"
+DEFAULT_JUDGE = "anthropic/claude-opus-4-8"
 
 # Extend Task 13 throttle dicts with Task 13.5-specific judge limits.
 # Anthropic Opus 4.6 has 30,000 ITPM on lower tiers. Each judge call is
 # ~1500 input tokens (post + claims + JUDGE_SYSTEM guidelines). To stay
 # under 30k ITPM with margin: concurrency=1 + 4s sleep = 15 RPM × 1500 = 22.5k ITPM.
-CONCURRENCY_OVERRIDES.setdefault("anthropic/claude-opus-4-6", 1)
+CONCURRENCY_OVERRIDES.setdefault("anthropic/claude-opus-4-8", 1)
 # Anthropic 30k ITPM tier: ~3k tokens/call × 7.5 RPM = ~22.5k ITPM, safely under
 # limit. Earlier 4s gave 15 RPM = 45k ITPM and triggered silent rate-limit deaths.
-MIN_CALL_INTERVAL_SECONDS.setdefault("anthropic/claude-opus-4-6", 8.0)
+MIN_CALL_INTERVAL_SECONDS.setdefault("anthropic/claude-opus-4-8", 1)
 # Gemini 3 Flash Preview shares free-tier 15 RPM with Flash Lite Preview.
 CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3-flash-preview", 1)
-MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3-flash-preview", 7.0)
+MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3-flash-preview", 1)
+MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3.1-flash-lite-preview", 1)
 # Gemini 3.1 Pro Preview — Tier 1 paid tier gives ~150 RPM; throttle to ~30 RPM
 # (concurrency=2 + 1s) for safety against bursty token-per-minute caps.
 CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3.1-pro-preview", 2)
