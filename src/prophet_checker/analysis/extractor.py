@@ -18,8 +18,9 @@ logger = logging.getLogger(__name__)
 class PredictionExtractor:
     """Extracts verifiable predictions from raw text using an LLM."""
 
-    def __init__(self, llm) -> None:
+    def __init__(self, llm, system_prompt: str | None = None) -> None:
         self._llm = llm
+        self._system_prompt = system_prompt
 
     async def extract(
         self,
@@ -35,7 +36,9 @@ class PredictionExtractor:
                 person_name=person_name,
                 published_date=published_date,
             )
-            response = await self._llm.complete(prompt, system=get_extraction_system())
+            response = await self._llm.complete(
+                prompt, system=self._system_prompt or get_extraction_system()
+            )
         except Exception:
             logger.exception("LLM call failed during extraction")
             return []

@@ -116,3 +116,25 @@ async def test_extract_drops_prediction_with_missing_situation():
         published_date="2023-01-15",
     )
     assert predictions == []
+
+
+async def test_extract_uses_production_system_prompt_by_default():
+    from prophet_checker.llm.prompts import get_extraction_system
+
+    llm = make_llm(LLM_RESPONSE_ONE)
+    extractor = PredictionExtractor(llm)
+    await extractor.extract(
+        text="T", person_id="p", document_id="d",
+        person_name="Арестович", published_date="2023-01-15",
+    )
+    assert llm.complete.call_args.kwargs["system"] == get_extraction_system()
+
+
+async def test_extract_uses_system_prompt_override():
+    llm = make_llm(LLM_RESPONSE_ONE)
+    extractor = PredictionExtractor(llm, system_prompt="CUSTOM PROMPT")
+    await extractor.extract(
+        text="T", person_id="p", document_id="d",
+        person_name="Арестович", published_date="2023-01-15",
+    )
+    assert llm.complete.call_args.kwargs["system"] == "CUSTOM PROMPT"
