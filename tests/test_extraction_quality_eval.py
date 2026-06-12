@@ -1073,3 +1073,27 @@ def test_default_extractor_factory_passes_system_prompt(monkeypatch):
 
     extractor_default = _default_extractor_factory("gemini/gemini-3.1-flash-lite-preview")
     assert extractor_default._system_prompt is None
+
+
+def test_resolve_extraction_prompt_default_is_production():
+    from extraction.extraction_quality_eval import _resolve_extraction_prompt
+    from prophet_checker.llm.prompts import get_extraction_system
+    import hashlib
+
+    override, meta = _resolve_extraction_prompt(None)
+    assert override is None
+    assert meta["extraction_prompt"] == "production"
+    expected_sha = hashlib.sha256(get_extraction_system().encode()).hexdigest()[:12]
+    assert meta["extraction_prompt_sha256"] == expected_sha
+
+
+def test_resolve_extraction_prompt_reads_file(tmp_path):
+    from extraction.extraction_quality_eval import _resolve_extraction_prompt
+    import hashlib
+
+    f = tmp_path / "variant.md"
+    f.write_text("VARIANT PROMPT", encoding="utf-8")
+    override, meta = _resolve_extraction_prompt(str(f))
+    assert override == "VARIANT PROMPT"
+    assert meta["extraction_prompt"] == str(f)
+    assert meta["extraction_prompt_sha256"] == hashlib.sha256(b"VARIANT PROMPT").hexdigest()[:12]

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -50,6 +51,7 @@ from extraction.detection_eval import (  # noqa: E402
     _default_extractor_factory,
 )
 from prophet_checker.llm.client import LLMClient  # noqa: E402
+from prophet_checker.llm.prompts import get_extraction_system  # noqa: E402
 
 
 # =============================================================================
@@ -579,6 +581,24 @@ def _load_filtered_posts(args: argparse.Namespace) -> tuple[list[dict], dict[str
         counts["after_limit"] = len(posts)
     counts["after_author"] = sum(1 for p in posts if p["person_name"] == args.author)
     return posts, counts
+
+
+def _resolve_extraction_prompt(path: str | None) -> tuple[str | None, dict[str, str]]:
+    """Resolve --extraction-prompt: (override_text | None, metadata).
+
+    None (дефолт) = продакшн-промпт із prompts.py — override не передається,
+    але sha256 рахується, щоб артефакт фіксував, ЩО саме було проганяно.
+    """
+    if path is None:
+        text = get_extraction_system()
+        name = "production"
+        override = None
+    else:
+        text = Path(path).read_text(encoding="utf-8")
+        name = str(path)
+        override = text
+    sha = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+    return override, {"extraction_prompt": name, "extraction_prompt_sha256": sha}
 
 
 def _format_run_plan(
