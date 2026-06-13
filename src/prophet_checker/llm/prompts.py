@@ -63,6 +63,15 @@ G. Non-substantive claims (fail criterion 4 — outcome is mechanically determin
    - "Трамп зможе вести переговори тільки після інавгурації 20 січня" — known constitutional fact, not a prediction
    - "Суд має винести рішення до кінця місяця" — procedural deadline, not an outcome forecast
    - "Парламент проведе засідання у вівторок" — calendar-bound certainty
+   - "Ухвалений закон передбачає, що розголошення даних розвідки каратиметься..." —
+     restating provisions of an adopted law/decision is a KNOWN FACT, not a forecast
+
+
+H. Analysis of intentions, goals, or plans of third parties — NOT the author's forecast:
+   - "Кремль хоче: звинуватити Україну у зриві перемир'я, зняти санкції..." —
+     enumeration of someone's GOALS; the author does not assert these goals WILL be achieved
+   - "ОПЗЖ спробують усунути Зеленського" — characterization of intent, not a forecast of outcome
+   Extract ONLY if the author explicitly asserts the third party WILL SUCCEED.
 
 Verification tests:
 - Criterion 2: "Could an impartial fact-checker in 1 year objectively confirm or refute this?"
@@ -86,6 +95,21 @@ R3. Preserve the author's stance and polarity. Capture WHOSE action is
     prediction is the FAILURE of that process — do NOT extract each step as
     if the author forecasts its success.
 
+R4. MODALITY PRESERVATION — the most common extraction error. Reconstruction
+    (R1-R3) must NEVER upgrade modality:
+    - Obligation/demand/proposal is NOT a forecast: "повинні бути звільнені",
+      "треба", "необхідно", "пропоную", "закликаю", "надо подумать",
+      "должны быть" → do NOT extract, do NOT rewrite as "буде/станеться".
+    - Hedged claims must keep their hedge: "сприятиме X" ≠ "призведе до X";
+      "має шанси" ≠ "станеться". If the claim only passes criterion 2 after
+      strengthening the hedge — do NOT extract it.
+    - Questions, interview timecodes, quoted theses the author criticizes —
+      are NOT assertions by the author.
+    - Sarcastic warnings and rhetorical dilemmas are NOT forecasts:
+      "Мало вам не покажется" is a threat-flavored quip, not a prediction;
+      "його доля незавидна: припинити війну і втратити посаду, або програти"
+      describes a dilemma, not a forecast of which outcome will occur.
+
 EXAMPLE (enumerated agenda the author predicts will fail):
 Source: "Ожидаемые вехи на пути комиссии Ермак-Козак: — прекращение огня;
 — вода в Крым; — выборы в ОРДЛО... Поэтому, я думаю что у Путина-Зеленского
@@ -94,6 +118,43 @@ WRONG -> ["прекращение огня;", "вода в Крым;", "выбо
         (fragments; inverted polarity — author predicts these will NOT happen)
 RIGHT -> "Спроба поетапного примирення з РФ через комісію Єрмак–Козак
         (припинення вогню, вода в Крим, вибори в ОРДЛО) зрештою провалиться."
+
+EXAMPLE (demand, not forecast):
+Source: "Все оккупированные районы Нагорного Карабаха должны быть освобождены."
+WRONG -> "Азербайджан повністю звільнить усі окуповані райони..."
+         (the author demands it; he does not forecast it)
+RIGHT -> (nothing extracted)
+
+EXAMPLE (interview timecode phrased as a question):
+Source: "0:31 Україна вистоїть, як держава? 1:05 Чи буде наступ на Київ?"
+WRONG -> "Україна вистоїть як держава у разі широкомасштабної війни."
+         (fabricated an assertion from a question heading)
+RIGHT -> (nothing extracted)
+
+EXAMPLE (abstract societal "law" without verifiable criterion):
+Source: "Эволюционный закон: власть в Украине всегда будет получать сила,
+представляющая поликультурное, городское, социально активное население."
+WRONG -> "В Україні політичну владу завжди здобуватиме та політична сила, яка
+         представлятиме інтереси полікультурного, міського населення."
+         (an abstract "law" — no specific election, date, or measurable threshold)
+RIGHT -> (nothing extracted)
+
+EXAMPLE (rhetorical doom without criteria):
+Source: "Социальная система Украины будет разрушена полностью. Без возможности возврата."
+WRONG -> "Поточна соціальна система України буде повністю зруйнована без можливості повернення."
+         (no checkable event, no timeframe — vague forward rhetoric, category D)
+RIGHT -> (nothing extracted)
+
+
+FINAL GATE — apply to every candidate claim BEFORE emitting it:
+"Does the AUTHOR assert this WILL happen?" If the source phrasing is a demand,
+proposal, hope, question, or an enumeration of someone's goals — DROP the claim.
+When in doubt, DROP: a missed prediction is cheaper than a fabricated one.
+
+SECOND GATE — verifiability: for each claim that passed the first gate, name to
+yourself the concrete event, threshold, or date a fact-checker could check.
+A thesis about societal trends, national character, or "historical laws" has no
+such criterion — DROP it. If you cannot say WHAT exactly will be checkable, DROP.
 
 Respond ONLY with raw JSON — do NOT wrap in markdown code fences."""
 
