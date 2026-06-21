@@ -85,6 +85,28 @@ Optimise new code for the next reader. A green linter is a floor, not proof of r
 - **Reuse first; rule of three**: use an existing helper before writing new logic; extract a shared helper on the *third* repetition, not the first — don't add speculative abstraction.
 - **Edit in place, small diffs**: modify the existing function rather than adding a parallel v2; don't reformat or refactor unrelated code in the same change.
 
+## Logging
+
+Use the stdlib `logging` module; loggers are already per-module (`logger = logging.getLogger(__name__)`) — keep it that way. Logging is configured once at the app entry (`__main__.py`), level via `Settings.log_level`.
+
+- **Never `print()` in `src/`** — use `logger`. `print()` is fine only for `scripts/` CLI output.
+- **Modules never configure logging** — no `basicConfig`/handlers/`setLevel` at import. Modules only get a logger and log; configuration lives at the entry point.
+- **Lazy args, never f-strings in log calls**: `logger.info("verified %d/%d", done, total)`, not `logger.info(f"...")`. Ruff `G004` / pylint `W1203` enforce this.
+- **Pick the level deliberately:**
+
+  | Level | Use for |
+  |---|---|
+  | `DEBUG` | detailed diagnostics, off in prod (payload shapes, per-item traces) |
+  | `INFO` | normal milestones: cycle start/finish, counts, model chosen |
+  | `WARNING` | unexpected but handled (soft-normalize, retries, skipped items) |
+  | `ERROR` | an operation failed — use `logger.exception()` inside an `except` |
+  | `CRITICAL` | the process cannot continue |
+
+- **Exceptions**: in `except`, use `logger.exception("…")` (captures the traceback). **Don't log-and-raise** — either log here, or raise and let the boundary (`app.py`) log once. Not both.
+- **Never log secrets or raw payloads**: no API keys, Telegram tokens, `.env` values, or full post / LLM request-response bodies. Log IDs, counts, and lengths.
+- **Don't over-log in loops**: no per-item `INFO` in the ingestion/verification loops — summarise, or log progress every N (as `run_cycle` already does). Per-item detail → `DEBUG`.
+- **Correlation**: include a stable id (e.g. `cycle_id`) on a run's log lines so they grep together. Nice-to-have; don't build a framework for it.
+
 ## Design docs are the source of truth (read before building)
 
 This project practices spec-driven development. Non-trivial work is specced as a **`design.md` + `plan.md` pair** inside a use-case subfolder of `docs/` (e.g. `docs/verifier-v2/`, `docs/ingestion-to-aws/`, `docs/verification-track/`), filenamed `YYYY-MM-DD-<topic>.md` by creation date. Before implementing in an area, read that area's design + plan first, and follow the same design → plan → TDD flow for new work.

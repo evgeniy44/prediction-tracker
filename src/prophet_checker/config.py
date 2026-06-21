@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     embeddings_enabled: bool = True
     tg_session_path: str = "tg_session"
     verification_confidence_threshold: float = 0.6
+    log_level: str = "INFO"
 
     model_config = {
         "env_file": ".env",
