@@ -73,6 +73,18 @@ Ingestion-cycle flow: `IngestionOrchestrator.run_cycle()` (`ingestion/orchestrat
 - **Commits**: history uses `type(scope): subject` (conventional commits), written in Ukrainian.
 - **Never commit**: `.env` and the Telethon `tg_session*` file (a logged-in account session).
 
+## Coding rules (new code)
+
+Optimise new code for the next reader. A green linter is a floor, not proof of readability — don't trust "it looks clean"; lean on types and the linter.
+
+- **Typed boundaries, not raw dicts**: at parser / LLM / repo boundaries return a Pydantic model (like the `models/domain.py` models), not a `dict` with string keys — magic-key dicts hide the contract and break silently on a typo.
+- **One source of truth for enum values**: validate against the domain enums (`PredictionStatus`, `PredictionStrength`, …); never hardcode their string values (`{"confirmed", "refuted", …}`) in a parser or check.
+- **Type your Protocol dependencies**: constructor params taking a repo/client/source get their Protocol type — an untyped `prediction_repo` hides the interface a reader (and the type checker) needs.
+- **Comment the WHY, never the WHAT**: a one-line comment only where intent isn't inferable (e.g. overwriting a field from a second LLM call). No comments that restate the code.
+- **Keep new functions small and flat**: target cyclomatic complexity ≤10, ≤~40 lines, ≤5 args; use guard clauses / early returns instead of deep nesting.
+- **Reuse first; rule of three**: use an existing helper before writing new logic; extract a shared helper on the *third* repetition, not the first — don't add speculative abstraction.
+- **Edit in place, small diffs**: modify the existing function rather than adding a parallel v2; don't reformat or refactor unrelated code in the same change.
+
 ## Design docs are the source of truth (read before building)
 
 This project practices spec-driven development. Non-trivial work is specced as a **`design.md` + `plan.md` pair** inside a use-case subfolder of `docs/` (e.g. `docs/verifier-v2/`, `docs/ingestion-to-aws/`, `docs/verification-track/`), filenamed `YYYY-MM-DD-<topic>.md` by creation date. Before implementing in an area, read that area's design + plan first, and follow the same design → plan → TDD flow for new work.
