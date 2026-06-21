@@ -1,7 +1,9 @@
 # Retrieval Eval (RAG v1) — Design
 
 **Дата:** 2026-06-19
-**Status:** 📋 designed — pre-implementation
+**Status:** ✅ implemented (Tasks 1–10). **РІШЕННЯ (2026-06-21):** робоча конфігурація —
+`text-embedding-3-small` + репрезентація `claim+situation`; мультимодельне порівняння **parked**
+(харнес готовий до прогону). Прокинуто в прод-інжест + backfill.
 **Контур:** офлайн-eval для вибору embedding-моделі + репрезентації під майбутній RAG query-флоу
 ([`../architecture/2026-04-26-flow-production-rag.md`](../architecture/2026-04-26-flow-production-rag.md)).
 
