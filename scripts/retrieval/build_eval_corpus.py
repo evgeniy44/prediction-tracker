@@ -3,19 +3,31 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from contextlib import AsyncExitStack
 from datetime import timedelta
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from prophet_checker.config import Settings
-from prophet_checker.models.domain import (
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(PROJECT_ROOT / ".env", override=True)
+except ImportError:
+    pass
+
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
+
+from prophet_checker.config import Settings  # noqa: E402
+from prophet_checker.models.domain import (  # noqa: E402
     Prediction,
     PredictionStrength,
     PredictionValue,
 )
-from prophet_checker.storage.postgres import PostgresPredictionRepository
+from prophet_checker.storage.postgres import PostgresPredictionRepository  # noqa: E402
 
 _RANK = {
     PredictionStrength.LOW: 0,

@@ -4,12 +4,24 @@ import argparse
 import asyncio
 import json
 import random
+import sys
 from collections import defaultdict
 from itertools import cycle
 from pathlib import Path
 
-from prophet_checker.config import Settings
-from prophet_checker.llm import LLMClient
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(PROJECT_ROOT / ".env", override=True)
+except ImportError:
+    pass
+
+from prophet_checker.config import Settings  # noqa: E402
+from prophet_checker.llm import LLMClient  # noqa: E402
 
 
 def _cell(row: dict) -> tuple[str, str]:

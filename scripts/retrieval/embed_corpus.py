@@ -3,14 +3,26 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from contextlib import AsyncExitStack
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from prophet_checker.config import Settings
-from prophet_checker.llm import EmbeddingClient
-from retrieval.eval_store import PostgresEvalEmbStore
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(PROJECT_ROOT / ".env", override=True)
+except ImportError:
+    pass
+
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
+
+from prophet_checker.config import Settings  # noqa: E402
+from prophet_checker.llm import EmbeddingClient  # noqa: E402
+from retrieval.eval_store import PostgresEvalEmbStore  # noqa: E402
 
 REPRESENTATIONS = ("claim_text", "situation", "claim_situation")
 
