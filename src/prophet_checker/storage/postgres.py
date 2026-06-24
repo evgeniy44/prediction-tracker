@@ -349,6 +349,12 @@ class PostgresVectorStore:
     ) -> list[VectorMatch]:
         async with self._session_factory() as session:
             dist = PredictionDB.embedding.cosine_distance(query_embedding)
-            stmt = select(PredictionDB.id, dist.label("distance")).order_by(dist).limit(limit)
+            # лише ембеджені рядки: cosine_distance(NULL, q) = NULL → інакше distance None
+            stmt = (
+                select(PredictionDB.id, dist.label("distance"))
+                .where(PredictionDB.embedding.is_not(None))
+                .order_by(dist)
+                .limit(limit)
+            )
             result = await session.execute(stmt)
             return [VectorMatch(prediction_id=r[0], distance=r[1]) for r in result.all()]
