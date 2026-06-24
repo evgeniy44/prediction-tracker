@@ -33,6 +33,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # no
 from prophet_checker.analysis.embedding_text import embedding_text  # noqa: E402
 from prophet_checker.config import Settings  # noqa: E402
 from prophet_checker.llm import EmbeddingClient  # noqa: E402
+from prophet_checker.storage.interfaces import (  # noqa: E402
+    PersonRepository,
+    PredictionRepository,
+    VectorStore,
+)
 from prophet_checker.storage.postgres import (  # noqa: E402
     PostgresPersonRepository,
     PostgresPredictionRepository,
@@ -40,7 +45,13 @@ from prophet_checker.storage.postgres import (  # noqa: E402
 )
 
 
-async def backfill(person_repo, prediction_repo, vector_store, embedder) -> int:
+async def backfill(
+    person_repo: PersonRepository,
+    prediction_repo: PredictionRepository,
+    vector_store: VectorStore,
+    embedder: EmbeddingClient,
+    progress_every: int = 200,
+) -> int:
     """Для кожного прогнозу всіх осіб: embed(claim+situation) → store_embedding. Повертає к-сть."""
     count = 0
     for person in await person_repo.list_all():
@@ -48,6 +59,8 @@ async def backfill(person_repo, prediction_repo, vector_store, embedder) -> int:
             vector = await embedder.embed(embedding_text(pred))
             await vector_store.store_embedding(pred.id, vector)
             count += 1
+            if count % progress_every == 0:
+                print(f"backfilled {count} predictions...")
     return count
 
 
