@@ -160,3 +160,54 @@ async def test_query_503_when_not_initialized():
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.post("/query", json={"question": "q"})
     assert resp.status_code == 503
+
+
+@pytest.fixture(autouse=True)
+def _clear_answer_orchestrator_state():
+    yield
+    if hasattr(app.state, "answer_orchestrator"):
+        delattr(app.state, "answer_orchestrator")
+
+
+async def test_answer_returns_answer_and_sources():
+    from prophet_checker.models.domain import (
+        AnswerResult,
+        Prediction,
+        RetrievedPrediction,
+    )
+
+    ao = MagicMock()
+    pred = Prediction(
+        id="p1", document_id="d", person_id="x", claim_text="c", prediction_date=date(2024, 1, 1)
+    )
+    ao.answer = AsyncMock(
+        return_value=AnswerResult(
+            query="q",
+            answer="відповідь",
+            sources=[RetrievedPrediction(prediction=pred, distance=0.1, rank=1)],
+        )
+    )
+    app.state.answer_orchestrator = ao
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/answer", json={"question": "q", "limit": 5})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["answer"] == "відповідь"
+    assert body["sources"][0]["prediction"]["id"] == "p1"
+
+
+async def test_answer_422_on_empty_question():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/answer", json={"question": "", "limit": 5})
+    assert resp.status_code == 422
+
+
+async def test_answer_503_when_not_initialized():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/answer", json={"question": "q"})
+    assert resp.status_code == 503
