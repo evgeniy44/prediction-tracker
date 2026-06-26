@@ -84,6 +84,7 @@ Optimise new code for the next reader. A green linter is a floor, not proof of r
 - **Keep new functions small and flat**: target cyclomatic complexity ≤10, ≤~40 lines, ≤5 args; use guard clauses / early returns instead of deep nesting.
 - **Reuse first; rule of three**: use an existing helper before writing new logic; extract a shared helper on the *third* repetition, not the first — don't add speculative abstraction.
 - **Edit in place, small diffs**: modify the existing function rather than adding a parallel v2; don't reformat or refactor unrelated code in the same change.
+- **Don't unit-test pure Pydantic models**: a class that is only field declarations (no validators, no methods, no computed properties) is tested by Pydantic itself — don't write a test that just constructs it and reads fields back. Test the code that *uses* the model (orchestrators, endpoints, prompts) instead.
 
 ## Logging
 
