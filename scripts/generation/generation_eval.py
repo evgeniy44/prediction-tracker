@@ -87,6 +87,9 @@ async def _main(judge_model: str, limit: int, concurrency: int) -> None:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
+    # сторонні бібліотеки логують INFO на кожен виклик/запит — топить наш прогрес
+    logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     p = argparse.ArgumentParser(
         description="Generation eval (faithfulness + refusal + completeness)"
     )
