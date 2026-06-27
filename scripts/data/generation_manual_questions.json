@@ -1,0 +1,203 @@
+[
+  {
+    "question": "Які прогнози Арестович робив про український контрнаступ і прорив російської оборони у 2022-2023 роках?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "d83a4c35-f137-46d2-acbd-843e75ff689d",
+      "367d100b-25e5-4b9c-bf51-b9ed1018cb5d",
+      "a7e9b86d-3c18-43f6-b13c-3d10430d574a"
+    ]
+  },
+  {
+    "question": "Що Арестович прогнозував про оборону Маріуполя та заводу «Азовсталь» навесні 2022 року?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "c5c3ddd6-3e84-44fb-973d-b072cd91d5db",
+      "994a288c-b888-4863-9518-66ae57f61f5e"
+    ]
+  },
+  {
+    "question": "Які прогнози про переговори між Україною та Росією Арестович давав у 2024 році?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "3b638e48-6fe3-45e8-a7b3-71cc0203bf50",
+      "db3925d3-ea7e-4820-908d-863d249bef71"
+    ]
+  },
+  {
+    "question": "Що Арестович прогнозував про вступ України до НАТО в різні роки?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "b6928337-680d-44e1-b3b4-eafe613a66fb",
+      "d5c6b794-d263-48ec-9cdc-3febd9a35a2a"
+    ]
+  },
+  {
+    "question": "Які прогнози Арестович робив про російську мобілізацію та стратегічні резерви РФ?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "f5d28605-e537-41ac-aa02-c20fb334bba5",
+      "2eb207ea-0769-4afb-a0de-091119fd4caa",
+      "e99aa70f-3630-4c9a-8ad1-600c9d4d4369"
+    ]
+  },
+  {
+    "question": "Які терміни закінчення війни називав Арестович у різні періоди?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "407b6225-6924-44d9-a246-2a49ec7e5df8",
+      "3babc7f0-7a44-420a-bd6a-26de84c3a2fc",
+      "eca00a0e-e29e-43ba-b3d5-566e310032de"
+    ]
+  },
+  {
+    "question": "Що Арестович прогнозував напередодні повномасштабного вторгнення у січні-лютому 2022 року?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "8b4bc844-91bb-49be-8ea8-f7b664e9d39b",
+      "8434bb85-a491-42b8-846b-6bbdf6081b14",
+      "355015cb-0102-4501-972e-672d38f41e2e"
+    ]
+  },
+  {
+    "question": "Що Арестович прогнозував про роль Трампа у переговорах і завершенні війни?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "a103dfc2-2865-4fff-ba7a-d8a98d76a72d",
+      "fc040b4a-ad00-4e12-9e42-5d8a70345c6b"
+    ]
+  },
+  {
+    "question": "Які прогнози Арестович давав про подальшу втрату Україною територій у 2025-2026 роках?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "5738cbaf-e8c4-435d-8b9b-63589358b61a",
+      "e28b31a5-1dec-439e-bdda-49a936c2ff0b",
+      "587bf950-17b9-4f2f-8439-98499aa3b99c"
+    ]
+  },
+  {
+    "question": "Що Арестович прогнозував про Євгена Пригожина та ЧВК «Вагнер» у 2023 році?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "31e2c6ac-6f41-434f-aac8-89698ed5a9db",
+      "b8e7e9a8-4399-4572-8ae4-b2a855886467"
+    ]
+  },
+  {
+    "question": "Які прогнози Арестович робив про внутрішній розкол чи розпад Росії?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "c255d28c-a029-4c7a-9e7b-1f3635b84e48",
+      "f4b447b0-27e3-46eb-b63e-1cd8971bbf11"
+    ]
+  },
+  {
+    "question": "Що Арестович прогнозував про вірмено-азербайджанський конфлікт за Карабах у 2020 році?",
+    "category": "synthesis",
+    "prediction_ids": [
+      "c02fceaf-5ffb-457c-97e5-8372b39fefbc",
+      "6ac14e59-d6bc-40c1-8983-71c54535e168"
+    ]
+  },
+  {
+    "question": "Який рецепт класичного українського борщу?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Хто отримав «Оскар» за найкращий фільм у 2020 році?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Скільки гравців однієї футбольної команди одночасно на полі?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Яка столиця Австралії?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Як спекти домашній хліб на заквасці?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Хто написав роман «Майстер і Маргарита»?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Яка хімічна формула води?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Які породи собак найкраще підходять для життя у квартирі?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Яка приблизна відстань від Землі до Місяця?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Коли відбудеться наступний літній чемпіонат світу з футболу?",
+    "category": "off_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Що Арестович прогнозував про результати президентських виборів у США 2028 року?",
+    "category": "near_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Які прогнози Арестович давав про курс гривні до долара на кінець 2026 року?",
+    "category": "near_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Що Арестович казав про ймовірність військового перевороту в Білорусі у 2023 році?",
+    "category": "near_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Які прогнози Арестович робив про вступ Молдови до Європейського Союзу?",
+    "category": "near_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Що Арестович прогнозував про відставку конкретного міністра оборони України?",
+    "category": "near_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Які прогнози Арестович давав про результати парламентських виборів у Грузії 2024 року?",
+    "category": "near_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Що Арестович казав про застосування Росією тактичної ядерної зброї по Києву?",
+    "category": "near_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Які прогнози Арестович робив про проведення Олімпійських ігор 2024 року в Парижі?",
+    "category": "near_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Що Арестович прогнозував про ціни на природний газ у Європі взимку 2027 року?",
+    "category": "near_domain",
+    "prediction_ids": []
+  },
+  {
+    "question": "Які прогнози Арестович давав про дату відкриття конкретного нового оборонного заводу?",
+    "category": "near_domain",
+    "prediction_ids": []
+  }
+]
