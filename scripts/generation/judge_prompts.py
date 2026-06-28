@@ -12,7 +12,6 @@ FAITHFULNESS_SYSTEM = (
     "Ти — суворий фактчекер. Розкладаєш ВІДПОВІДЬ на атомарні фактичні твердження "
     "й перевіряєш кожне проти наданих ДЖЕРЕЛ. Відповідаєш ЛИШЕ валідним JSON."
 )
-REFUSAL_SYSTEM = "Визначаєш, чи текст є відмовою відповісти за браком даних. Відповідаєш ЛИШЕ JSON."
 COMPLETENESS_SYSTEM = (
     "Визначаєш, чи конкретне ТВЕРДЖЕННЯ відображене у ВІДПОВІДІ. Відповідаєш ЛИШЕ JSON."
 )
@@ -43,14 +42,6 @@ def build_faithfulness_prompt(answer: str, sources: list) -> str:
     )
 
 
-def build_refusal_prompt(answer: str) -> str:
-    return (
-        "Чи ВІДПОВІДЬ є відмовою відповісти (каже, що не може / немає даних)? "
-        'Формат: {"refused": true|false}\n\n'
-        f"ВІДПОВІДЬ:\n{answer}"
-    )
-
-
 def build_completeness_prompt(answer: str, claim: str) -> str:
     return (
         "Чи ВІДПОВІДЬ відображає (згадує або передає суть) ТВЕРДЖЕННЯ? "
@@ -65,10 +56,6 @@ def parse_faithfulness_response(text: str) -> list[ClaimVerdict]:
         ClaimVerdict(claim=c["claim"], supported=bool(c["supported"]), reason=c.get("reason", ""))
         for c in data.get("claims", [])
     ]
-
-
-def parse_refusal_response(text: str) -> bool:
-    return bool(_extract_json(text)["refused"])
 
 
 def parse_completeness_response(text: str) -> tuple[bool, str]:

@@ -3,7 +3,6 @@ from datetime import date
 from generation.judge_prompts import (
     parse_completeness_response,
     parse_faithfulness_response,
-    parse_refusal_response,
     render_sources,
 )
 from prophet_checker.models.domain import (
@@ -21,11 +20,6 @@ def test_parse_faithfulness_response_plain_and_fenced():
     assert claims[1].supported is False
     fenced = '```json\n{"claims": []}\n```'
     assert parse_faithfulness_response(fenced) == []
-
-
-def test_parse_refusal_response():
-    assert parse_refusal_response('{"refused": true}') is True
-    assert parse_refusal_response('{"refused": false}') is False
 
 
 def test_parse_completeness_response():
