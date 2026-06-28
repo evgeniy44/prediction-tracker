@@ -12,7 +12,8 @@
 > поріг релевантності та end-to-end RAG — ЗАПАРКОВАНО** в окремий трек (RAG-eval + retrieval threshold),
 > бо refusal — властивість retrieval-handoff, не генерації. Причина: live-retrieval у v1 конфаундив
 > генерацію з retrieval (completeness карав за retrieval-промахи). Секції нижче описують **v1**
-> (end-to-end з refusal) — будуть переписані при ревізії v2.
+> (end-to-end з refusal). **Актуальний дизайн → [2026-06-27-generation-eval-v2-design.md](2026-06-27-generation-eval-v2-design.md)**
+> (ізольована генерація на **заморожених** gold-прогнозах, БД-free рантайм).
 
 ---
 
