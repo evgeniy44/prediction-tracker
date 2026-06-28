@@ -5,7 +5,6 @@ import argparse
 import asyncio
 import logging
 import sys
-from contextlib import AsyncExitStack
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,19 +16,13 @@ from eval_common import EvalMetadata, run_eval  # noqa: E402
 from eval_common.clients import build_eval_llm  # noqa: E402
 from eval_common.judge import LLMJudge, fingerprint_prompt  # noqa: E402
 from generation.gold import load_generation_gold  # noqa: E402
-from generation.judge_prompts import (  # noqa: E402
-    COMPLETENESS_SYSTEM,
-    FAITHFULNESS_SYSTEM,
-    REFUSAL_SYSTEM,
-)
+from generation.judge_prompts import COMPLETENESS_SYSTEM, FAITHFULNESS_SYSTEM  # noqa: E402
 from generation.metrics import aggregate  # noqa: E402
-from generation.scorers import (  # noqa: E402
-    CompletenessScorer,
-    FaithfulnessScorer,
-    RefusalScorer,
-)
+from generation.scorers import CompletenessScorer, FaithfulnessScorer  # noqa: E402
 from prophet_checker.config import Settings  # noqa: E402
-from prophet_checker.factory import build_answer_orchestrator  # noqa: E402
+from prophet_checker.llm import LLMClient  # noqa: E402
+from prophet_checker.models.domain import RetrievedPrediction  # noqa: E402
+from prophet_checker.query.answer_orchestrator import AnswerOrchestrator  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +33,11 @@ OUT_DIR = PROJECT_ROOT / "scripts" / "outputs" / "generation_eval"
 async def _main(judge_model: str, limit: int, concurrency: int) -> None:
     settings = Settings()
     cases = load_generation_gold(GOLD_PATH)
-    if limit:  # 0 = усі; інакше — перші N кейсів (швидкий прогін)
+    cases = [c for c in cases if c.labels.answerable]  # v2: лише answerable — gold ізолює генерацію
+    if limit:  # 0 = усі; інакше — перші N
         cases = cases[:limit]
     judge = LLMJudge(build_eval_llm(judge_model, temperature=0), judge_id=judge_model)
-    scorers = [FaithfulnessScorer(judge), RefusalScorer(judge), CompletenessScorer(judge)]
+    scorers = [FaithfulnessScorer(judge), CompletenessScorer(judge)]
     logger.info(
         "generation eval: %d cases, judge=%s, concurrency=%d", len(cases), judge_model, concurrency
     )
@@ -52,48 +46,51 @@ async def _main(judge_model: str, limit: int, concurrency: int) -> None:
         eval_name="generation",
         created_at=datetime.now(UTC).isoformat(),
         n_cases=len(cases),
-        sut_models={
-            "generator": "gemini/gemini-3.1-flash-lite-preview",
-            "embedder": settings.embedding_model,
-        },
+        sut_models={"generator": "gemini/gemini-3.1-flash-lite-preview"},
         judge_id=judge_model,
         prompt_fingerprints={
             "faithfulness": fingerprint_prompt(FAITHFULNESS_SYSTEM),
-            "refusal": fingerprint_prompt(REFUSAL_SYSTEM),
             "completeness": fingerprint_prompt(COMPLETENESS_SYSTEM),
         },
         dataset_path=str(GOLD_PATH),
     )
 
-    async with AsyncExitStack() as stack:
-        orchestrator = await build_answer_orchestrator(settings, stack)
+    llm = LLMClient(
+        provider="gemini",
+        model="gemini-3.1-flash-lite-preview",
+        api_key=settings.gemini_api_key,
+        temperature=0,
+    )
+    orchestrator = AnswerOrchestrator(llm)  # generate-only: query_orchestrator=None
 
-        async def run_one(case):
-            return await orchestrator.answer(case.input.question, limit=case.input.limit)
+    async def run_one(case):
+        sources = [
+            RetrievedPrediction(prediction=es.prediction, distance=0.0, rank=i)
+            for i, es in enumerate(case.labels.expected_sources, 1)
+        ]
+        return await orchestrator.answer_from_sources(case.input.question, sources)
 
-        report = await run_eval(
-            cases, run_one, scorers, aggregate, metadata, OUT_DIR, concurrency=concurrency
-        )
+    report = await run_eval(
+        cases, run_one, scorers, aggregate, metadata, OUT_DIR, concurrency=concurrency
+    )
 
     m = report.metrics
     logger.info(
-        "generation eval: n=%d faithfulness=%.3f recall=%.3f refusal_acc=%.3f false_answer=%.3f",
+        "generation eval: n=%d faithfulness=%.3f recall=%.3f",
         m.n_total,
         m.faithfulness_mean or 0.0,
         m.recall_mean or 0.0,
-        m.refusal_accuracy,
-        m.false_answer_rate,
     )
     print(f"report → {OUT_DIR}/report.md  (judge-based, ще не human-calibrated)")
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    # сторонні бібліотеки логують INFO на кожен виклик/запит — топить наш прогрес
+    # сторонні бібліотеки логують INFO на кожен запит — топить наш прогрес
     logging.getLogger("LiteLLM").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     p = argparse.ArgumentParser(
-        description="Generation eval (faithfulness + refusal + completeness)"
+        description="Generation eval v2 (faithfulness + completeness, isolated on frozen gold)"
     )
     p.add_argument("--judge", default="anthropic/claude-opus-4-8")
     p.add_argument("--limit", type=int, default=0, help="run only first N cases (0 = all)")
