@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from prophet_checker.models.domain import Prediction
+
 
 class GenerationInput(BaseModel):
     question: str
@@ -10,8 +12,7 @@ class GenerationInput(BaseModel):
 
 
 class ExpectedSource(BaseModel):
-    prediction_id: str
-    claim: str
+    prediction: Prediction
 
 
 class GenerationLabels(BaseModel):

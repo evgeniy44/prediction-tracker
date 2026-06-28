@@ -9,7 +9,17 @@ def test_load_generation_gold(tmp_path):
             "id": "a000",
             "question": "q1",
             "answerable": True,
-            "expected_sources": [{"prediction_id": "p1", "claim": "c1"}],
+            "expected_sources": [
+                {
+                    "prediction": {
+                        "id": "p1",
+                        "document_id": "d",
+                        "person_id": "x",
+                        "claim_text": "c1",
+                        "prediction_date": "2024-01-01",
+                    }
+                }
+            ],
             "category": "single_source",
         },
         {
@@ -28,5 +38,6 @@ def test_load_generation_gold(tmp_path):
     assert cases[0].id == "a000"
     assert cases[0].input.question == "q1"
     assert cases[0].labels.answerable is True
-    assert cases[0].labels.expected_sources[0].prediction_id == "p1"
+    assert cases[0].labels.expected_sources[0].prediction.id == "p1"
+    assert cases[0].labels.expected_sources[0].prediction.claim_text == "c1"
     assert cases[1].labels.category == "off_domain"
