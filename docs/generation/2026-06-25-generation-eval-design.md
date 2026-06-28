@@ -6,6 +6,14 @@
 оцінює генерацію `POST /answer` (`AnswerOrchestrator`).
 **Дослідження:** [`2026-06-25-eval-research-summary.md`](2026-06-25-eval-research-summary.md)
 
+> **⚠️ Scope revision (2026-06-27, після першого прогону):** generation-eval звужується до
+> **ізольованої генерації на gold-контексті** — метрики лише **faithfulness + completeness**, SUT =
+> половина генерації (дано gold `expected_sources`), без живого retrieval. **Refusal, off-corpus-питання,
+> поріг релевантності та end-to-end RAG — ЗАПАРКОВАНО** в окремий трек (RAG-eval + retrieval threshold),
+> бо refusal — властивість retrieval-handoff, не генерації. Причина: live-retrieval у v1 конфаундив
+> генерацію з retrieval (completeness карав за retrieval-промахи). Секції нижче описують **v1**
+> (end-to-end з refusal) — будуть переписані при ревізії v2.
+
 ---
 
 ## Мета
