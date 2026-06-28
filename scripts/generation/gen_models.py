@@ -30,12 +30,6 @@ class FaithfulnessDetail(BaseModel):
     claims: list[ClaimVerdict]
 
 
-class RefusalDetail(BaseModel):
-    refused: bool
-    answerable: bool
-    category: str
-
-
 class SourceCoverage(BaseModel):
     prediction_id: str
     covered: bool
@@ -50,18 +44,12 @@ class CategoryMetrics(BaseModel):
     n: int
     faithfulness_mean: float | None
     recall_mean: float | None
-    refusal_accuracy: float
 
 
 class GenerationMetrics(BaseModel):
     n_total: int
-    n_answered: int
-    n_refused: int
     n_errors: int
     faithfulness_mean: float | None
     hallucination_rate: float | None
     recall_mean: float | None
-    refusal_accuracy: float
-    over_refusal_rate: float
-    false_answer_rate: float
     by_category: dict[str, CategoryMetrics]
