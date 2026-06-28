@@ -1,9 +1,10 @@
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from fakes import FakePredictionRepo, FakeVectorStore
 
-from prophet_checker.models.domain import Prediction
+from prophet_checker.models.domain import Prediction, RetrievedPrediction
 from prophet_checker.query.answer_orchestrator import REFUSAL_NO_DATA, AnswerOrchestrator
 from prophet_checker.query.orchestrator import QueryOrchestrator
 
@@ -20,10 +21,19 @@ def _llm(text="згенерована відповідь"):
     return llm
 
 
+def _pred(pid="p1"):
+    return Prediction(
+        id=pid, document_id="d", person_id="x", claim_text="claim", prediction_date=date(2024, 1, 1)
+    )
+
+
+# --- answer() (end-to-end, search→делегування) ---
+
+
 async def test_answer_refuses_without_calling_llm_when_no_sources():
     qo = QueryOrchestrator(_embedder(), FakeVectorStore(), FakePredictionRepo())
     llm = _llm()
-    orch = AnswerOrchestrator(qo, llm)
+    orch = AnswerOrchestrator(llm, qo)
 
     result = await orch.answer("q")
 
@@ -36,24 +46,44 @@ async def test_answer_generates_with_sources():
     store = FakeVectorStore()
     repo = FakePredictionRepo()
     await store.store_embedding("p1", [0.1, 0.1, 0.1])
-    await repo.save(
-        Prediction(
-            id="p1",
-            document_id="d",
-            person_id="x",
-            claim_text="claim",
-            prediction_date=date(2024, 1, 1),
-        )
-    )
+    await repo.save(_pred("p1"))
     qo = QueryOrchestrator(_embedder(), store, repo)
     llm = _llm("  відповідь  ")
-    orch = AnswerOrchestrator(qo, llm)
+    orch = AnswerOrchestrator(llm, qo)
 
     result = await orch.answer("питання", limit=5)
 
     assert result.query == "питання"
-    assert result.answer == "відповідь"  # обрізані пробіли
+    assert result.answer == "відповідь"
     assert [s.prediction.id for s in result.sources] == ["p1"]
     llm.complete.assert_awaited_once()
-    prompt_arg = llm.complete.call_args.args[0]
-    assert "p1" in prompt_arg
+    assert "p1" in llm.complete.call_args.args[0]
+
+
+# --- answer_from_sources() (generate-only, без query_orchestrator) ---
+
+
+async def test_answer_from_sources_refuses_on_empty():
+    orch = AnswerOrchestrator(_llm())
+    result = await orch.answer_from_sources("q", [])
+    assert result.answer == REFUSAL_NO_DATA
+    assert result.sources == []
+
+
+async def test_answer_from_sources_generates():
+    llm = _llm("  відповідь  ")
+    orch = AnswerOrchestrator(llm)
+    sources = [RetrievedPrediction(prediction=_pred("p1"), distance=0.0, rank=1)]
+
+    result = await orch.answer_from_sources("питання", sources)
+
+    assert result.answer == "відповідь"
+    assert [s.prediction.id for s in result.sources] == ["p1"]
+    llm.complete.assert_awaited_once()
+    assert "p1" in llm.complete.call_args.args[0]
+
+
+async def test_answer_raises_without_query_orchestrator():
+    orch = AnswerOrchestrator(_llm())
+    with pytest.raises(RuntimeError):
+        await orch.answer("q")

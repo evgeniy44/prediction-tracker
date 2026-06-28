@@ -102,4 +102,4 @@ async def build_answer_orchestrator(
         api_key=settings.gemini_api_key,
         temperature=0,
     )
-    return AnswerOrchestrator(query_orchestrator, llm)
+    return AnswerOrchestrator(llm, query_orchestrator)
