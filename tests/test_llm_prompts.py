@@ -99,6 +99,20 @@ def test_build_rag_prompt():
     assert "refuted" in prompt
 
 
+def test_rag_prompt_contract_drops_leak_directives():
+    from prophet_checker.llm.prompts import RAG_SYSTEM, RAG_TEMPLATE
+
+    combined = RAG_SYSTEM + RAG_TEMPLATE
+    # старі директиви, що провокували лік службових полів, прибрані
+    assert "confidence scores" not in combined
+    assert "accuracy statistics" not in combined
+    # контракт присутній: переклад 4 статусів у людський вердикт
+    assert "прогноз справдився" in RAG_SYSTEM
+    assert "прогноз не справдився" in RAG_SYSTEM
+    assert "оцінити не вдалося" in RAG_SYSTEM
+    assert "ще зарано" in RAG_SYSTEM
+
+
 def test_build_verification_prompt_v2_substitutes_all_fields():
     from prophet_checker.llm.prompts import build_verification_prompt_v2
 
