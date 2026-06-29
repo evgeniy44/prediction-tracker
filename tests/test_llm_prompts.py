@@ -99,6 +99,33 @@ def test_build_rag_prompt():
     assert "refuted" in prompt
 
 
+def test_render_predictions_includes_all_fields():
+    from datetime import date
+
+    from prophet_checker.llm.prompts import render_predictions
+    from prophet_checker.models.domain import Prediction, PredictionStatus, RetrievedPrediction
+
+    pred = Prediction(
+        id="pred-1",
+        document_id="d",
+        person_id="x",
+        claim_text="Контрнаступ не досягне моря",
+        situation="південь",
+        prediction_date=date(2023, 6, 1),
+        target_date=date(2023, 12, 31),
+        status=PredictionStatus.REFUTED,
+        confidence=0.7,
+    )
+    text = render_predictions([RetrievedPrediction(prediction=pred, distance=0.2, rank=1)])
+    assert "pred-1" in text
+    assert "Контрнаступ не досягне моря" in text
+    assert "південь" in text
+    assert "2023-06-01" in text
+    assert "2023-12-31" in text
+    assert "refuted" in text
+    assert "0.7" in text
+
+
 def test_build_verification_prompt_v2_substitutes_all_fields():
     from prophet_checker.llm.prompts import build_verification_prompt_v2
 

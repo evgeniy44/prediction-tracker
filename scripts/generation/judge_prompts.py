@@ -5,6 +5,7 @@ import json
 import re
 
 from generation.gen_models import ClaimVerdict
+from prophet_checker.llm.prompts import render_predictions
 
 _FENCE_RE = re.compile(r"^\s*```(?:json|JSON)?\s*\n?(.*?)\n?\s*```\s*$", re.DOTALL)
 
@@ -23,22 +24,15 @@ def _extract_json(text: str) -> dict:
     return json.loads(payload)
 
 
-def render_sources(sources: list) -> str:
-    lines = []
-    for s in sources:
-        p = s.prediction
-        situation = f" | {p.situation}" if p.situation else ""
-        lines.append(f"[{p.id}] {p.claim_text}{situation} (status: {p.status.value})")
-    return "\n".join(lines)
-
-
 def build_faithfulness_prompt(answer: str, sources: list) -> str:
+    # render_predictions — той самий рендер, що бачить генератор (build_rag_prompt),
+    # тож суддя оцінює відповідь проти ТОТОЖНОГО джерела (без сліпоти до date/target/confidence)
     return (
         "Розклади ВІДПОВІДЬ на атомарні фактичні твердження. Для кожного визнач, чи воно "
         "підкріплене ДЖЕРЕЛАМИ (supported true/false). Якщо ВІДПОВІДЬ — відмова або не містить "
         'фактів, поверни порожній список. Формат: {"claims": [{"claim": "...", '
         '"supported": true, "reason": "..."}]}\n\n'
-        f"ВІДПОВІДЬ:\n{answer}\n\nДЖЕРЕЛА:\n{render_sources(sources)}"
+        f"ВІДПОВІДЬ:\n{answer}\n\nДЖЕРЕЛА:\n{render_predictions(sources)}"
     )
 
 

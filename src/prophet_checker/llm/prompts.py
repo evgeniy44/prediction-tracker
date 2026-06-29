@@ -374,7 +374,9 @@ def build_extraction_prompt(text: str, person_name: str, published_date: str) ->
     )
 
 
-def build_rag_prompt(question: str, sources: list[RetrievedPrediction]) -> str:
+def render_predictions(sources: list[RetrievedPrediction]) -> str:
+    """Render retrieved predictions as the source block. Single source of truth so the
+    generator (build_rag_prompt) and the faithfulness judge grade against the SAME view."""
     lines = []
     for s in sources:
         p = s.prediction
@@ -385,8 +387,11 @@ def build_rag_prompt(question: str, sources: list[RetrievedPrediction]) -> str:
             f"(date: {p.prediction_date.isoformat()}{target}, "
             f"status: {p.status.value}, confidence: {p.confidence})"
         )
-    context_str = "\n".join(lines)
-    return RAG_TEMPLATE.format(question=question, predictions_context=context_str)
+    return "\n".join(lines)
+
+
+def build_rag_prompt(question: str, sources: list[RetrievedPrediction]) -> str:
+    return RAG_TEMPLATE.format(question=question, predictions_context=render_predictions(sources))
 
 
 def build_verification_prompt_v2(
