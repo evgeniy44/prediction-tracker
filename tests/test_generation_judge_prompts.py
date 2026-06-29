@@ -1,10 +1,9 @@
 from datetime import date
 
 from generation.judge_prompts import (
+    build_faithfulness_prompt,
     parse_completeness_response,
     parse_faithfulness_response,
-    parse_refusal_response,
-    render_sources,
 )
 from prophet_checker.models.domain import (
     Prediction,
@@ -23,11 +22,6 @@ def test_parse_faithfulness_response_plain_and_fenced():
     assert parse_faithfulness_response(fenced) == []
 
 
-def test_parse_refusal_response():
-    assert parse_refusal_response('{"refused": true}') is True
-    assert parse_refusal_response('{"refused": false}') is False
-
-
 def test_parse_completeness_response():
     covered, reason = parse_completeness_response('{"covered": true, "reason": "так"}')
     assert covered is True and reason == "так"
@@ -35,7 +29,9 @@ def test_parse_completeness_response():
     assert covered is False
 
 
-def test_render_sources_includes_id_claim_status():
+def test_faithfulness_prompt_shows_judge_same_source_as_generator():
+    # суддя faithfulness має бачити ТЕ САМЕ джерело, що й генератор (build_rag_prompt):
+    # id/claim/status + date/target/confidence — інакше чесні echo дати/впевненості штучно карають
     pred = Prediction(
         id="p1",
         document_id="d",
@@ -43,9 +39,16 @@ def test_render_sources_includes_id_claim_status():
         claim_text="контрнаступ не дійде до моря",
         situation="південь",
         prediction_date=date(2023, 6, 1),
+        target_date=date(2023, 12, 31),
         status=PredictionStatus.REFUTED,
+        confidence=0.7,
     )
-    text = render_sources([RetrievedPrediction(prediction=pred, distance=0.2, rank=1)])
-    assert "p1" in text
-    assert "контрнаступ не дійде до моря" in text
-    assert "refuted" in text
+    prompt = build_faithfulness_prompt(
+        "якась відповідь", [RetrievedPrediction(prediction=pred, distance=0.2, rank=1)]
+    )
+    assert "p1" in prompt
+    assert "контрнаступ не дійде до моря" in prompt
+    assert "refuted" in prompt
+    assert "2023-06-01" in prompt  # date — раніше суддя цього НЕ бачив
+    assert "2023-12-31" in prompt  # target — раніше суддя цього НЕ бачив
+    assert "0.7" in prompt  # confidence — раніше суддя цього НЕ бачив
