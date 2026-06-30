@@ -65,7 +65,7 @@ STATUS_LABELS = ("confirmed", "refuted", "unresolved", "premature")
 STRENGTH_LABELS = ("low", "medium")
 VALUE_LABELS = ("low", "medium", "high")
 
-DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "data" / "verification_gold_labels.json"
+DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "data" / "verification" / "gold_labels.json"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "scripts" / "outputs" / "verification_eval"
 PER_MODEL_SUBDIR = "per_model"
 METRICS_FILENAME = "verification_eval_metrics.json"

@@ -26,7 +26,7 @@ from prophet_checker.query.answer_orchestrator import AnswerOrchestrator  # noqa
 
 logger = logging.getLogger(__name__)
 
-GOLD_PATH = PROJECT_ROOT / "scripts" / "data" / "generation_gold.json"
+GOLD_PATH = PROJECT_ROOT / "scripts" / "data" / "generation" / "gold.json"
 OUT_DIR = PROJECT_ROOT / "scripts" / "outputs" / "generation_eval"
 
 

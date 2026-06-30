@@ -29,7 +29,7 @@ from prophet_checker.llm.client import LLMClient
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gemini/gemini-3.1-flash-lite-preview"
-SAMPLE_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "sample_posts.json"
+SAMPLE_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "raw" / "samples" / "sample_posts.json"
 V1_EXTRACTIONS_PATH = PROJECT_ROOT / "scripts" / "outputs" / "extraction_eval" / "extraction_outputs.json"
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "scripts" / "outputs" / "verification_eval" / "v2_extraction_outputs.json"
 

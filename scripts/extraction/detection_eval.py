@@ -56,8 +56,8 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-GOLD_LABELS_PATH = PROJECT_ROOT / "scripts" / "data" / "gold_labels.json"
-SAMPLE_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "sample_posts.json"
+GOLD_LABELS_PATH = PROJECT_ROOT / "scripts" / "data" / "extraction" / "gold_labels.json"
+SAMPLE_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "raw" / "samples" / "sample_posts.json"
 RESULTS_DIR = PROJECT_ROOT / "scripts" / "outputs" / "detection_eval"
 
 PROVIDER_API_KEY_ENV = {

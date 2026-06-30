@@ -517,8 +517,8 @@ CONCURRENCY_OVERRIDES.setdefault("gemini/gemini-3.1-pro-preview", 2)
 MIN_CALL_INTERVAL_SECONDS.setdefault("gemini/gemini-3.1-pro-preview", 1.0)
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "data" / "gold_labels.json"
-DEFAULT_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "sample_posts.json"
+DEFAULT_GOLD_PATH = PROJECT_ROOT / "scripts" / "data" / "extraction" / "gold_labels.json"
+DEFAULT_POSTS_PATH = PROJECT_ROOT / "scripts" / "data" / "raw" / "samples" / "sample_posts.json"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "scripts" / "outputs" / "extraction_eval"
 
 

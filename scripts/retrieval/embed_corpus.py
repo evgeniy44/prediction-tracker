@@ -26,7 +26,7 @@ from retrieval.eval_store import PostgresEvalEmbStore  # noqa: E402
 
 REPRESENTATIONS = ("claim_text", "situation", "claim_situation")
 
-CORPUS_PATH = Path("scripts/data/retrieval_eval_corpus.json")
+CORPUS_PATH = Path("scripts/data/retrieval/corpus.json")
 
 # Кандидати фіналізуються screening'ом по MMTEB UK/RU; baseline лишається першим.
 MODELS = ["text-embedding-3-small"]

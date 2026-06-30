@@ -71,8 +71,8 @@ async def _main() -> None:
     from prophet_checker.config import Settings
     from prophet_checker.storage.postgres import PostgresPredictionRepository
 
-    retrieval_gold = json.loads((DATA / "retrieval_query_gold.json").read_text(encoding="utf-8"))
-    manual = json.loads((DATA / "generation_manual_questions.json").read_text(encoding="utf-8"))
+    retrieval_gold = json.loads((DATA / "retrieval" / "query_gold.json").read_text(encoding="utf-8"))
+    manual = json.loads((DATA / "generation" / "manual_questions.json").read_text(encoding="utf-8"))
 
     ids = {e["target_id"] for e in retrieval_gold}
     for m in manual:
@@ -88,7 +88,7 @@ async def _main() -> None:
         await engine.dispose()
 
     gold = build_gold(retrieval_gold, manual, predictions_by_id)
-    out_path = DATA / "generation_gold.json"
+    out_path = DATA / "generation" / "gold.json"
     out_path.write_text(json.dumps(gold, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"wrote {len(gold)} cases → {out_path}")
 

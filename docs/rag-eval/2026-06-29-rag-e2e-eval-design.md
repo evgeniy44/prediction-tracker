@@ -17,7 +17,7 @@
 
 ## Eval — `scripts/rag/e2e_eval.py`
 
-**Runner:** `AnswerOrchestrator.answer(question, limit)` — жива retrieval **із порогом A** → генерація → `AnswerResult` (відповідь + знайдені sources, або `REFUSAL_NO_DATA`). Gold — той самий `generation_gold.json` (повні 112: answerable + off-corpus refusal-кейси знову в грі).
+**Runner:** `AnswerOrchestrator.answer(question, limit)` — жива retrieval **із порогом A** → генерація → `AnswerResult` (відповідь + знайдені sources, або `REFUSAL_NO_DATA`). Gold — той самий `scripts/data/generation/gold.json` (повні 112: answerable + off-corpus refusal-кейси знову в грі).
 
 **Scorer-и** (`eval_common`, суддя Claude Opus):
 - **RefusalScorer** — воскрешаємо з generation-eval v1: off-corpus → має відмовити; answerable → має відповісти. Дає refusal-accuracy / over-refusal / false-answer.

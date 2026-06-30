@@ -25,18 +25,18 @@ scripts/
 | Файл | Опис |
 |------|------|
 | `tg_session.session` | Telethon auth artifact (gitignored) |
-| `data/sample_posts.json` | Канонічний multi-author датасет для evals (1049 постів) |
-| `data/sample_posts_100.json` | Малий sample для швидких тестів |
-| `data/arestovich/all.json` | Сирий dump каналу Арестовича від попереднього script-run |
-| `data/zdanov/1.json` | Сирий dump каналу Жданова |
+| `data/raw/samples/sample_posts.json` | Канонічний multi-author датасет для evals (1049 постів) |
+| `data/raw/samples/sample_posts_100.json` | Малий sample для швидких тестів |
+| `data/raw/arestovich/all.json` | Сирий dump каналу Арестовича від попереднього script-run |
+| `data/raw/zhdanov/posts.json` | Сирий dump каналу Жданова |
 
-### 2. Gold-лейбли → `data/gold_labels.json`
+### 2. Gold-лейбли → `data/extraction/gold_labels.json`
 
 Канонічна gold-розмітка для evals. 130 постів (97 Арестович + 16 Подоляк + 17 інших), кожен з `has_prediction: bool`.
 
 | Файл | Опис |
 |------|------|
-| `data/gold_labels.json` | Поточна gold (Task 12, 130 entries) |
+| `data/extraction/gold_labels.json` | Поточна gold (Task 12, 130 entries) |
 | `data/annotation_sample.json` | Раніша анотаційна вибірка |
 | `data/_legacy/` | Ранні мануальні експерименти (predictions_*.txt, predictions_manual.json — порожні / архівні) |
 

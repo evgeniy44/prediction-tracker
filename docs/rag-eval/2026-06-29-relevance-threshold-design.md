@@ -22,7 +22,7 @@ Eval робить **живий vector-search по прод-корпусу** → 
 ## Рамка рішень
 
 - **Об'єктив порога — trust-first:** max off-corpus-refusal за умови answerable retrieval-recall ≥ ~0.9. Краще зайва відмова, ніж впевнена відповідь на off-topic. Звіт — **повна крива** по всіх T; об'єктив лише обирає робочу точку.
-- **Переюз gold:** наявний `generation_gold.json` (92 answerable з `expected_sources` + 20 off-corpus: 10 off_domain + 10 near_domain).
+- **Переюз gold:** наявний `scripts/data/generation/gold.json` (92 answerable з `expected_sources` + 20 off-corpus: 10 off_domain + 10 near_domain).
 - **Поріг — у конфіг** (`Settings.relevance_threshold`); дефолт `None` = поточна поведінка (без порога). Eval передає `None` (сирий top-k для sweep); прод бере налаштоване.
 
 ## Eval — `scripts/rag/threshold_eval.py` (retrieval-only)

@@ -8,7 +8,7 @@ extraction_quality_eval.py --posts.
     python scripts/extraction/sample_holdout_posts.py \
         -n 100 -o scenarios/11-06-2026-evaluate-extraction/holdout/holdout_posts.json \
         --exclude scenarios/11-06-2026-evaluate-extraction/new/new_input_posts.json \
-        --exclude scripts/data/sample_posts.json
+        --exclude scripts/data/raw/samples/sample_posts.json
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import random
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-DEFAULT_SOURCE = PROJECT_ROOT / "scripts" / "data" / "arestovich" / "all.json"
+DEFAULT_SOURCE = PROJECT_ROOT / "scripts" / "data" / "raw" / "arestovich" / "all.json"
 
 
 def main() -> None:

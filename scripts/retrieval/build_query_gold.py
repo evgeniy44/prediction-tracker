@@ -98,9 +98,9 @@ async def generate_queries(row: dict, llm) -> list[dict]:
     return records
 
 
-CORPUS_PATH = Path("scripts/data/retrieval_eval_corpus.json")
-GOLD_PATH = Path("scripts/data/retrieval_query_gold.json")
-MANUAL_PATH = Path("scripts/data/retrieval_query_gold_manual.json")
+CORPUS_PATH = Path("scripts/data/retrieval/corpus.json")
+GOLD_PATH = Path("scripts/data/retrieval/query_gold.json")
+MANUAL_PATH = Path("scripts/data/retrieval/query_gold_manual.json")
 
 
 def ensure_manual_stub(path: Path) -> None:

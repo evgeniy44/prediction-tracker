@@ -18,8 +18,8 @@
 
 | Аргумент | Дефолт | Опис |
 |----------|--------|------|
-| `--posts` | `scripts/data/sample_posts.json` | пул постів `[{id, person_name, published_at, text}]` |
-| `--gold` | `scripts/data/gold_labels.json` | `[{id, has_prediction}]` — для recall та `--gold-only` |
+| `--posts` | `scripts/data/raw/samples/sample_posts.json` | пул постів `[{id, person_name, published_at, text}]` |
+| `--gold` | `scripts/data/extraction/gold_labels.json` | `[{id, has_prediction}]` — для recall та `--gold-only` |
 | `--extractors` | Flash Lite, DeepSeek, Sonnet, Gemini 3 Flash | CSV моделей-екстракторів |
 | `--judge` | `anthropic/claude-opus-4-6` | модель-суддя |
 | `--author` | `Арестович` | фільтр постів за `person_name` |
@@ -93,23 +93,23 @@
 ```bash
 # свій пул постів + своя вихідна тека, без gold
 .venv/bin/python scripts/extraction/extraction_quality_eval.py \
-  --posts scripts/data/sample_posts_100.json \
+  --posts scripts/data/raw/samples/sample_posts_100.json \
   --output-dir scripts/outputs/eval_sample100 \
   --no-gold
 
 # свої пости + свій gold + своя вихідна тека
 .venv/bin/python scripts/extraction/extraction_quality_eval.py \
-  --posts scripts/data/sample_posts.json \
-  --gold scripts/data/gold_labels.json \
+  --posts scripts/data/raw/samples/sample_posts.json \
+  --gold scripts/data/extraction/gold_labels.json \
   --output-dir scripts/outputs/eval_custom \
   --gold-only
 ```
 > **Вхід** задають `--posts` (пости) і `--gold` (gold-мітки) — будь-які шляхи до JSON потрібного формату. **Вихід** — `--output-dir`: туди пишуться **3 артефакти з фіксованими іменами** (`extraction_outputs.json`, `extraction_judgements.json`, `extraction_eval_report.json`); окремо їх не перейменувати, тож для паралельних прогонів задавай різні `--output-dir`.
 
-**9. A/B промпт-варіант екстракції** — кандидат із `scripts/data/prompts/`, окрема вихідна тека:
+**9. A/B промпт-варіант екстракції** — кандидат із `scripts/extraction/prompts/`, окрема вихідна тека:
 ```bash
 .venv/bin/python scripts/extraction/extraction_quality_eval.py \
-  --extraction-prompt scripts/data/prompts/extraction_v2_modality.md \
+  --extraction-prompt scripts/extraction/prompts/extraction_v2_modality.md \
   --extractors gemini/gemini-3.1-flash-lite-preview \
   --output-dir scripts/outputs/extraction_eval_prompt_v2 \
   --gold-only

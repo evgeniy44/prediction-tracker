@@ -31,7 +31,7 @@ from prophet_checker.config import Settings  # noqa: E402
 from prophet_checker.llm.client import LLMClient  # noqa: E402
 from prophet_checker.models.db import PredictionDB, RawDocumentDB  # noqa: E402
 
-ALL_POSTS = PROJECT_ROOT / "scripts" / "data" / "arestovich" / "all.json"
+ALL_POSTS = PROJECT_ROOT / "scripts" / "data" / "raw" / "arestovich" / "all.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "scripts" / "outputs" / "annotation" / "annotation_set.json"
 DEFAULT_MODEL = "gemini/gemini-3.1-flash-lite-preview"
 

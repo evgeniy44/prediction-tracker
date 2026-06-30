@@ -9,8 +9,8 @@ import random
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-ALL_POSTS = PROJECT_ROOT / "scripts" / "data" / "arestovich" / "all.json"
-GOLD = PROJECT_ROOT / "scripts" / "data" / "verification_gold_labels.json"
+ALL_POSTS = PROJECT_ROOT / "scripts" / "data" / "raw" / "arestovich" / "all.json"
+GOLD = PROJECT_ROOT / "scripts" / "data" / "verification" / "gold_labels.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "scripts" / "outputs" / "pipeline_run" / "selected_posts.json"
 
 

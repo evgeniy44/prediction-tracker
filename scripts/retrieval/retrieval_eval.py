@@ -25,7 +25,7 @@ from prophet_checker.llm import EmbeddingClient  # noqa: E402
 from retrieval.embed_corpus import REPRESENTATIONS, config_name  # noqa: E402
 from retrieval.eval_store import PostgresEvalEmbStore  # noqa: E402
 
-GOLD_PATH = Path("scripts/data/retrieval_query_gold.json")
+GOLD_PATH = Path("scripts/data/retrieval/query_gold.json")
 REPORT_PATH = Path("scripts/outputs/retrieval_eval/retrieval_eval_report.md")
 
 

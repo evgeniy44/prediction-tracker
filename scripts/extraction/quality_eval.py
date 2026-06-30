@@ -39,7 +39,7 @@ V1_REPORT_PATH = PROJECT_ROOT / "scripts" / "outputs" / "extraction_eval" / "ext
 DEFAULT_V2_EXTRACTIONS = PROJECT_ROOT / "scripts" / "outputs" / "verification_eval" / "v2_extraction_outputs.json"
 DEFAULT_JUDGEMENTS_OUT = PROJECT_ROOT / "scripts" / "outputs" / "verification_eval" / "v2_judgements.json"
 DEFAULT_REPORT_OUT = PROJECT_ROOT / "scripts" / "outputs" / "verification_eval" / "v2_quality_eval_report.md"
-GOLD_LABELS_PATH = PROJECT_ROOT / "scripts" / "data" / "gold_labels.json"
+GOLD_LABELS_PATH = PROJECT_ROOT / "scripts" / "data" / "extraction" / "gold_labels.json"
 
 
 def build_judge_client(model_id: str) -> LLMClient:

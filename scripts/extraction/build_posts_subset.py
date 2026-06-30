@@ -1,22 +1,22 @@
 """Будує підмножину постів за списком id у форматі входу extraction_quality_eval.py.
 
-Бере пости з корпусу (дефолт: scripts/data/arestovich/all.json), фільтрує за id
+Бере пости з корпусу (дефолт: scripts/data/raw/arestovich/all.json), фільтрує за id
 і пише JSON-список [{id, person_name, published_at, text}] — готовий для --posts.
 
 Приклади:
     # id як аргументи
     python scripts/extraction/build_posts_subset.py \
         O_Arestovich_official_312 O_Arestovich_official_7780 \
-        -o scripts/data/arestovich/eval_subset.json
+        -o scripts/data/raw/arestovich/eval_subset.json
 
     # id з файлу (по одному на рядок або JSON-список)
     python scripts/extraction/build_posts_subset.py \
-        --ids-file ids.txt -o scripts/data/arestovich/eval_subset.json
+        --ids-file ids.txt -o scripts/data/raw/arestovich/eval_subset.json
 
     # файл з голими номерами повідомлень (312, 7780, ...) — префікс додається сам
     python scripts/extraction/build_posts_subset.py \
         --ids-file msg_numbers.txt --prefix O_Arestovich_official_ \
-        -o scripts/data/arestovich/eval_subset.json
+        -o scripts/data/raw/arestovich/eval_subset.json
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-DEFAULT_SOURCE = PROJECT_ROOT / "scripts" / "data" / "arestovich" / "all.json"
+DEFAULT_SOURCE = PROJECT_ROOT / "scripts" / "data" / "raw" / "arestovich" / "all.json"
 
 
 def read_ids(args: argparse.Namespace) -> set[str]:

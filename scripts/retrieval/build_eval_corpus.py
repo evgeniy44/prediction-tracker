@@ -94,7 +94,7 @@ def write_corpus(predictions: list[Prediction], path: Path) -> None:
     path.write_text(json.dumps(rows, ensure_ascii=False, indent=2))
 
 
-CORPUS_PATH = Path("scripts/data/retrieval_eval_corpus.json")
+CORPUS_PATH = Path("scripts/data/retrieval/corpus.json")
 
 
 async def build(person_id: str, min_gap_days: int, out_path: Path) -> int:
